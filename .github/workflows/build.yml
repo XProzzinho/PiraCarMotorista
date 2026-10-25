@@ -16,6 +16,10 @@ jobs:
           distribution: temurin
           java-version: "17"
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: "3.24.5"
@@ -25,9 +29,14 @@ jobs:
       - name: Gerar projeto Android
         run: |
           mkdir /tmp/bak && cp -r lib pubspec.yaml /tmp/bak/
-          flutter create --platforms=android --org com.piracar --project-name piracar_motorista .
+          flutter create --platforms=android --org com.piracar --project-name piracar_passageiro .
           rm -rf lib pubspec.yaml
           cp -r /tmp/bak/lib /tmp/bak/pubspec.yaml .
+
+      - name: Gerar ícones e logo
+        run: |
+          pip install pillow
+          python3 tool/icone.py
 
       - name: Configurar Android (Maps, Firebase)
         env:
@@ -37,9 +46,13 @@ jobs:
           python3 tool/patch_android.py "$MAPS_KEY"
 
       - run: flutter pub get
-      - run: flutter build apk --release
+
+      - name: Compilar APK
+        env:
+          MAPS_KEY: ${{ secrets.MAPS_API_KEY }}
+        run: flutter build apk --release --dart-define=MAPS_KEY="$MAPS_KEY"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: piracar-motorista-apk
+          name: piracar-passageiro-apk
           path: build/app/outputs/flutter-apk/app-release.apk
