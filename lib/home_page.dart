@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_ringtone_player/flutter_ringtone_player.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -29,15 +33,52 @@ class _HomePageState extends State<HomePage> {
   Rota? _rota;
   String? _rotaChave;
 
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _sub;
+  final Set<String> _vistos = {};
+  bool _temAtiva = false;
+
   @override
   void initState() {
     super.initState();
     _localizar();
   }
 
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
+
   void _aviso(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  // Liga/desliga o modo online e fica de olho nos pedidos novos.
+  void _alternarOnline(bool v) {
+    setState(() => _online = v);
+    _sub?.cancel();
+    _sub = null;
+    if (!v) return;
+    _vistos.clear();
+    _sub = _db
+        .collection('corridas')
+        .where('status', isEqualTo: 'solicitada')
+        .snapshots()
+        .listen((snap) {
+      var novo = false;
+      for (final d in snap.docs) {
+        if (_vistos.add(d.id)) novo = true;
+      }
+      if (novo && !_temAtiva) _tocar();
+    });
+  }
+
+  void _tocar() {
+    try {
+      FlutterRingtonePlayer().playNotification();
+      HapticFeedback.vibrate();
+    } catch (_) {}
   }
 
   Future<void> _localizar() async {
@@ -349,6 +390,7 @@ class _HomePageState extends State<HomePage> {
           if (s == 'aceita' || s == 'em_andamento') ativa = d;
         }
         final ativaFinal = ativa;
+        _temAtiva = ativaFinal != null;
         WidgetsBinding.instance
             .addPostFrameCallback((_) => _garantirRota(ativaFinal));
 
@@ -506,7 +548,7 @@ class _HomePageState extends State<HomePage> {
             ),
             Switch(
               value: _online,
-              onChanged: (v) => setState(() => _online = v),
+              onChanged: _alternarOnline,
               activeColor: Colors.white,
               activeTrackColor: _verde,
               inactiveThumbColor: Colors.white,
