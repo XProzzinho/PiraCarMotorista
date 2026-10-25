@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "664182998571",
+    "project_id": "piracar-ec7e4",
+    "storage_bucket": "piracar-ec7e4.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:664182998571:android:fa88cfcbe6e8be9b70cc6e",
+        "android_client_info": {
+          "package_name": "com.piracar.piracar_passageiro"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC8FfzZD9XDBXWDnblJMg8VImZ-rvlxZuQ"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
