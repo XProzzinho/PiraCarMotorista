@@ -29,7 +29,7 @@ jobs:
       - name: Gerar projeto Android
         run: |
           mkdir /tmp/bak && cp -r lib pubspec.yaml /tmp/bak/
-          flutter create --platforms=android --org com.piracar --project-name piracar_passageiro .
+          flutter create --platforms=android --org com.piracar --project-name piracar_motorista .
           rm -rf lib pubspec.yaml
           cp -r /tmp/bak/lib /tmp/bak/pubspec.yaml .
 
@@ -54,5 +54,5 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: piracar-passageiro-apk
+          name: piracar-motorista-apk
           path: build/app/outputs/flutter-apk/app-release.apk
