@@ -1,9 +1,12 @@
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
+import 'cadastro_veiculo.dart';
 
 const _azulNoite = Color(0xFF0B2545);
 const _azul = Color(0xFF1565C0);
@@ -23,17 +26,20 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _nome = TextEditingController();
   final _carro = TextEditingController();
+  final _cor = TextEditingController();
   final _placa = TextEditingController();
   final _email = TextEditingController();
   final _senha = TextEditingController();
   bool _cadastro = false;
   bool _carregando = false;
   bool _mostrarSenha = false;
+  Uint8List? _cnh;
 
   @override
   void dispose() {
     _nome.dispose();
     _carro.dispose();
+    _cor.dispose();
     _placa.dispose();
     _email.dispose();
     _senha.dispose();
@@ -45,16 +51,23 @@ class _LoginPageState extends State<LoginPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
-  Future<void> _salvarPerfil(User user, String nome) {
+  Future<void> _salvarPerfil(User user, String nome, {bool temCnh = false}) {
     return FirebaseFirestore.instance.collection('users').doc(user.uid).set({
       'nome': nome,
       'email': user.email,
       'carro': _carro.text.trim(),
+      'cor': _cor.text.trim(),
       'placa': _placa.text.trim().toUpperCase(),
+      'temCnh': temCnh,
       'role': 'motorista',
       'aprovado': false,
       'criadoEm': FieldValue.serverTimestamp(),
     });
+  }
+
+  Future<void> _escolherCnh() async {
+    final foto = await escolherFotoCnh(context);
+    if (foto != null && mounted) setState(() => _cnh = foto);
   }
 
   /// Encerra a sessão se a conta não for de motorista.
@@ -70,13 +83,27 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   Future<void> _enviar() async {
+    if (_cadastro) {
+      final vazio = [_nome, _carro, _cor, _placa]
+          .any((c) => c.text.trim().isEmpty);
+      if (vazio) {
+        _aviso('Preencha nome, modelo, cor e placa do carro.');
+        return;
+      }
+      if (_cnh == null) {
+        _aviso('Envie a foto da sua CNH.');
+        return;
+      }
+    }
     setState(() => _carregando = true);
     try {
       final auth = FirebaseAuth.instance;
       if (_cadastro) {
         final cred = await auth.createUserWithEmailAndPassword(
             email: _email.text.trim(), password: _senha.text);
-        await _salvarPerfil(cred.user!, _nome.text.trim());
+        final cnh = _cnh!;
+        await salvarCnh(cred.user!.uid, cnh);
+        await _salvarPerfil(cred.user!, _nome.text.trim(), temCnh: true);
       } else {
         final cred = await auth.signInWithEmailAndPassword(
             email: _email.text.trim(), password: _senha.text);
@@ -84,6 +111,8 @@ class _LoginPageState extends State<LoginPage> {
       }
     } on FirebaseAuthException catch (e) {
       _aviso(e.message ?? 'Erro ao entrar');
+    } catch (e) {
+      _aviso('Não foi possível concluir: $e');
     } finally {
       if (mounted) setState(() => _carregando = false);
     }
@@ -246,12 +275,19 @@ class _LoginPageState extends State<LoginPage> {
             decoration: _decoracao('Seu nome', Icons.person_outline),
           ),
           const SizedBox(height: 16),
-          _rotulo('Carro'),
+          _rotulo('Modelo do carro'),
           TextField(
             controller: _carro,
             textCapitalization: TextCapitalization.sentences,
             decoration:
-                _decoracao('Modelo e cor', Icons.directions_car_outlined),
+                _decoracao('Ex.: Onix, HB20', Icons.directions_car_outlined),
+          ),
+          const SizedBox(height: 16),
+          _rotulo('Cor do carro'),
+          TextField(
+            controller: _cor,
+            textCapitalization: TextCapitalization.sentences,
+            decoration: _decoracao('Ex.: Prata', Icons.palette_outlined),
           ),
           const SizedBox(height: 16),
           _rotulo('Placa'),
@@ -260,6 +296,9 @@ class _LoginPageState extends State<LoginPage> {
             textCapitalization: TextCapitalization.characters,
             decoration: _decoracao('ABC1D23', Icons.pin_outlined),
           ),
+          const SizedBox(height: 16),
+          _rotulo('Foto da CNH'),
+          CampoFotoCnh(foto: _cnh, onTap: _escolherCnh),
           const SizedBox(height: 16),
         ],
         _rotulo('E-mail'),
