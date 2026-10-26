@@ -145,6 +145,11 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
 
   GoogleMapController? _mapa;
   LatLng? _eu;
+
+  // Mapa 3D: câmera inclinada que segue o carro e gira com a direção.
+  bool _seguir = true;
+  double _direcao = 0;
+  double _zoom3d = 17.5;
   bool _online = false;
 
   BitmapDescriptor _iconeCarro =
@@ -264,10 +269,11 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
   void _novaPosicao(Position p, {bool centralizar = false}) {
     if (!mounted) return;
     final ll = LatLng(p.latitude, p.longitude);
+    // só usa a direção quando o carro está andando (parado ela oscila)
+    if (p.speed > 1.5 && p.heading >= 0) _direcao = p.heading;
     setState(() => _eu = ll);
-    if (centralizar) {
-      _mapa?.animateCamera(CameraUpdate.newLatLngZoom(ll, 15));
-    }
+    if (centralizar) _seguir = true;
+    if (_seguir) _camera3d();
     _enviarPosicao(ll);
     _atualizarRota();
   }
@@ -377,7 +383,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     final d = _oferta;
     if (id == null || d == null) {
       if (_eu != null && _corridaId == null) {
-        _mapa?.animateCamera(CameraUpdate.newLatLngZoom(_eu!, 15));
+        _voltar3d();
       }
       return;
     }
@@ -564,7 +570,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     });
     _aviso(msg);
     if (_eu != null) {
-      _mapa?.animateCamera(CameraUpdate.newLatLngZoom(_eu!, 15));
+      _voltar3d();
     }
     _escolherOferta();
   }
@@ -652,11 +658,33 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     final primeira = _rota == null;
     _rotaOrigem = origem;
     setState(() => _rota = rota);
-    if (primeira) _ajustarCamera([origem, alvo, ...rota.pontos]);
+    if (primeira) {
+      _ajustarCamera([origem, alvo, ...rota.pontos]);
+      // mostra a rota inteira por 4 s e volta a seguir o carro em 3D
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted && _corridaId != null && !_seguir) _voltar3d();
+      });
+    }
+  }
+
+  void _camera3d() {
+    if (_eu == null) return;
+    _mapa?.animateCamera(CameraUpdate.newCameraPosition(CameraPosition(
+      target: _eu!,
+      zoom: _zoom3d,
+      tilt: 60,
+      bearing: _direcao,
+    )));
+  }
+
+  void _voltar3d() {
+    _seguir = true;
+    _camera3d();
   }
 
   void _ajustarCamera(List<LatLng> pts) {
     if (pts.length < 2) return;
+    _seguir = false; // visão geral da rota (de cima)
     double minLat = pts.first.latitude, maxLat = minLat;
     double minLng = pts.first.longitude, maxLng = minLng;
     for (final p in pts) {
@@ -681,7 +709,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     if (_eu != null && alvo != null) {
       _ajustarCamera([_eu!, alvo, ...?_rota?.pontos]);
     } else if (_eu != null) {
-      _mapa?.animateCamera(CameraUpdate.newLatLngZoom(_eu!, 15));
+      _voltar3d();
     }
   }
 
@@ -702,9 +730,17 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
       drawer: _menu(),
       body: Stack(
         children: [
-          GoogleMap(
-            initialCameraPosition:
-                const CameraPosition(target: _centroPirapora, zoom: 13),
+          Listener(
+            onPointerDown: (_) => _seguir = false,
+            child: GoogleMap(
+            initialCameraPosition: const CameraPosition(
+                target: _centroPirapora, zoom: 16, tilt: 60),
+            buildingsEnabled: true,
+            tiltGesturesEnabled: true,
+            compassEnabled: false,
+            onCameraMove: (pos) {
+              if (_seguir) _zoom3d = pos.zoom.clamp(14.0, 20.0);
+            },
             myLocationEnabled: false,
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
@@ -781,10 +817,9 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
             },
             onMapCreated: (c) {
               _mapa = c;
-              if (_eu != null) {
-                c.animateCamera(CameraUpdate.newLatLngZoom(_eu!, 15));
-              }
+              if (_eu != null) _camera3d();
             },
+          ),
           ),
           Positioned(top: 0, left: 0, right: 0, child: _barraTopo()),
           Positioned(
@@ -792,12 +827,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
             bottom: oferta != null ? 420 : 300,
             child: Column(
               children: [
-                _botaoRedondo(Icons.my_location, () {
-                  if (_eu != null) {
-                    _mapa?.animateCamera(
-                        CameraUpdate.newLatLngZoom(_eu!, 16));
-                  }
-                }),
+                _botaoRedondo(Icons.my_location, _voltar3d),
                 const SizedBox(height: 10),
                 _botaoRedondo(Icons.add,
                     () => _mapa?.animateCamera(CameraUpdate.zoomIn())),
