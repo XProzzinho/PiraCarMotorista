@@ -10,6 +10,8 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'cadastro_veiculo.dart';
+import 'foto.dart';
+import 'foto_trocar.dart';
 import 'rota.dart';
 import 'tokens.dart';
 
@@ -170,6 +172,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
   String? _ofertaEndereco;
   double? _ofertaNota;
   int _ofertaNotas = 0;
+  Map<String, dynamic>? _ofertaPassageiro;
   bool _primeiraLista = true;
 
   // Corrida ativa
@@ -379,6 +382,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
       _ofertaEndereco = null;
       _ofertaNota = null;
       _ofertaNotas = 0;
+      _ofertaPassageiro = null;
     });
     final d = _oferta;
     if (id == null || d == null) {
@@ -424,6 +428,17 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
       } catch (_) {}
     }
 
+    Future<void> passageiro() async {
+      final pid = d['passageiroId'];
+      if (pid is! String) return;
+      try {
+        final s = await _db.collection('users').doc(pid).get();
+        if (mounted && _ofertaId == id) {
+          setState(() => _ofertaPassageiro = s.data());
+        }
+      } catch (_) {}
+    }
+
     Future<void> nota() async {
       final pid = d['passageiroId'];
       if (pid is! String) return;
@@ -446,7 +461,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
       } catch (_) {}
     }
 
-    await Future.wait([ateMim(), viagem(), endereco(), nota()]);
+    await Future.wait([ateMim(), viagem(), endereco(), nota(), passageiro()]);
     if (!mounted || _ofertaId != id) return;
     _ajustarCamera([
       if (eu != null) eu,
@@ -922,9 +937,29 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
         children: [
           UserAccountsDrawerHeader(
             decoration: const BoxDecoration(color: _azul),
-            currentAccountPicture: const CircleAvatar(
-              backgroundColor: Colors.white,
-              child: Icon(Icons.person, size: 40, color: _azul),
+            currentAccountPicture: GestureDetector(
+              onTap: () => trocarFotoPerfil(context),
+              child: Stack(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: const BoxDecoration(
+                        color: Colors.white, shape: BoxShape.circle),
+                    child: FotoPerfil(dados: d, raio: 34),
+                  ),
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                          color: Colors.white, shape: BoxShape.circle),
+                      child: const Icon(Icons.photo_camera,
+                          size: 14, color: _azul),
+                    ),
+                  ),
+                ],
+              ),
             ),
             accountName: Text((d['nome'] ?? 'Motorista').toString()),
             accountEmail: Text((d['email'] ??
@@ -1144,13 +1179,26 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
                   fontSize: 36,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5)),
+        const SizedBox(height: 4),
         Row(
           children: [
+            FotoPerfil(dados: _ofertaPassageiro, raio: 18),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                (_ofertaPassageiro?['nome'] ?? 'Passageiro').toString(),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: 8),
             const Icon(Icons.star_rounded, size: 18, color: Colors.black87),
             const SizedBox(width: 3),
             Text(
               _ofertaNota == null
-                  ? 'Passageiro novo'
+                  ? 'Novo'
                   : '${_ofertaNota!.toStringAsFixed(2).replaceAll('.', ',')} '
                       '($_ofertaNotas)',
               style: cinza,
@@ -1260,6 +1308,8 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (c['passageiroId'] is String)
+          _CartaoPassageiro(uid: c['passageiroId'] as String),
         Text(indoBuscar ? 'Indo buscar o passageiro' : 'Corrida em andamento',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 2),
@@ -1355,6 +1405,53 @@ class _AvaliacaoDialogState extends State<_AvaliacaoDialog> {
           child: const Text('Enviar'),
         ),
       ],
+    );
+  }
+}
+
+/// Foto e nome do passageiro durante a corrida.
+class _CartaoPassageiro extends StatelessWidget {
+  const _CartaoPassageiro({required this.uid});
+
+  final String uid;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream:
+          FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+      builder: (context, snap) {
+        final m = snap.data?.data();
+        if (m == null) return const SizedBox.shrink();
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF4F6FA),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Row(
+            children: [
+              FotoPerfil(dados: m, raio: 24),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Passageiro',
+                        style: TextStyle(fontSize: 12, color: Colors.black54)),
+                    Text((m['nome'] ?? 'Passageiro').toString(),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
