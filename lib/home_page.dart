@@ -4,24 +4,26 @@ import 'dart:ui' as ui;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:geocoding/geocoding.dart';
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'rota.dart';
 
-// Preço: valor fixo até 3 km; depois, valor por km extra (proporcional).
-const _valorBase = 10.0;
-const _kmIncluidos = 3.0;
-const _precoKmExtra = 1.76;
+const _azul = Color(0xFF1E88E5);
+const _verde = Color(0xFF2E7D32);
 
-double _calcularValor(double km) {
-  if (km <= _kmIncluidos) return _valorBase;
-  return double.parse(
-      (_valorBase + (km - _kmIncluidos) * _precoKmExtra).toStringAsFixed(2));
-}
+const _nomesPagamento = {
+  'credito': 'Cartão de crédito',
+  'debito': 'Cartão de débito',
+  'pix': 'Pix',
+};
 
-String _real(double v) => 'R\$ ${v.toStringAsFixed(2).replaceAll('.', ',')}';
+String _real(num v) =>
+    'R\$ ${v.toDouble().toStringAsFixed(2).replaceAll('.', ',')}';
+
+LatLng? _ll(dynamic gp) =>
+    gp is GeoPoint ? LatLng(gp.latitude, gp.longitude) : null;
 
 // Desenha um ícone (carrinho, bonequinho) dentro de um círculo colorido.
 Future<BitmapDescriptor> _criarIcone(IconData icone, Color cor,
@@ -50,116 +52,393 @@ Future<BitmapDescriptor> _criarIcone(IconData icone, Color cor,
   return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
 }
 
-class HomePage extends StatefulWidget {
+// Toca o som de notificação do celular.
+Future<void> _tocarSom() async {
+  try {
+    await const MethodChannel('flutter_ringtone_player')
+        .invokeMethod('play', {'android': 2, 'ios': 1007, 'asAlarm': false});
+  } catch (_) {}
+}
+
+class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
   @override
-  State<HomePage> createState() => _HomePageState();
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser!.uid;
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream:
+          FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
+        }
+        final dados = snap.data!.data() ?? {};
+        if (dados['aprovado'] != true) return const _EmAnalise();
+        return _MapaMotorista(dados: dados);
+      },
+    );
+  }
 }
 
-class _HomePageState extends State<HomePage> {
+class _EmAnalise extends StatelessWidget {
+  const _EmAnalise();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.hourglass_top, size: 72, color: _azul),
+              const SizedBox(height: 16),
+              const Text('Cadastro em análise',
+                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              const Text(
+                'Assim que o seu cadastro for aprovado, você poderá ficar '
+                'online e receber corridas.',
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              OutlinedButton(
+                onPressed: () => FirebaseAuth.instance.signOut(),
+                child: const Text('Sair'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _MapaMotorista extends StatefulWidget {
+  final Map<String, dynamic> dados;
+  const _MapaMotorista({required this.dados});
+
+  @override
+  State<_MapaMotorista> createState() => _MapaMotoristaState();
+}
+
+class _MapaMotoristaState extends State<_MapaMotorista> {
   static const _centroPirapora = LatLng(-17.3453, -44.9419);
 
-  final _destino = TextEditingController();
-  GoogleMapController? _mapa;
-  LatLng? _posicao;
-  LatLng? _destinoLL;
-  String _destinoTexto = '';
-  Rota? _rota;
-  double? _valor;
-  String? _pagamento;
-  String? _corridaId;
-  bool _calculando = false;
-  bool _pedindo = false;
-
-  BitmapDescriptor _iconePessoa = BitmapDescriptor.defaultMarkerWithHue(
-      BitmapDescriptor.hueAzure);
-  BitmapDescriptor _iconeCarro =
-      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
-
-  // Acompanhamento do motorista em tempo real
-  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _subCorrida;
-  String? _status;
-  LatLng? _motorista;
-  Rota? _rotaMotorista;
-  LatLng? _rotaOrigem;
-  DateTime _rotaTentativa = DateTime.fromMillisecondsSinceEpoch(0);
-  bool _buscandoRota = false;
-
+  final _scaffold = GlobalKey<ScaffoldState>();
   final _db = FirebaseFirestore.instance;
   final _uid = FirebaseAuth.instance.currentUser!.uid;
 
-  static const _statusTexto = {
-    'solicitada': 'Procurando motorista...',
-    'aceita': 'Motorista a caminho',
-    'em_andamento': 'Corrida em andamento',
-    'finalizada': 'Corrida finalizada',
-    'cancelada': 'Corrida cancelada',
-  };
+  GoogleMapController? _mapa;
+  LatLng? _eu;
+  bool _online = false;
 
-  static const _formas = {
-    'credito': 'Crédito',
-    'debito': 'Débito',
-    'pix': 'Pix',
-  };
+  BitmapDescriptor _iconeCarro =
+      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueGreen);
+  BitmapDescriptor _iconePessoa =
+      BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
 
-  static const _icones = {
-    'credito': Icons.credit_card,
-    'debito': Icons.payment,
-    'pix': Icons.qr_code_2,
-  };
+  StreamSubscription<Position>? _subPos;
+  StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subPedidos;
+  final Set<String> _vistos = {};
+  bool _primeiraLista = true;
 
-  static const _nomesPagamento = {
-    'credito': 'Cartão de crédito',
-    'debito': 'Cartão de débito',
-    'pix': 'Pix',
-  };
+  // Corrida ativa
+  String? _corridaId;
+  Map<String, dynamic>? _corrida;
+  String? _statusAnterior;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _subCorrida;
+  DateTime _ultimoEnvio = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _aceitando = false;
+
+  // Rota
+  Rota? _rota;
+  LatLng? _rotaOrigem;
+  DateTime _rotaTentativa = DateTime.fromMillisecondsSinceEpoch(0);
+  bool _buscandoRota = false;
 
   @override
   void initState() {
     super.initState();
     _carregarIcones();
-    _localizar();
+    _iniciarLocalizacao();
+    _retomarCorrida();
   }
 
   @override
   void dispose() {
+    _subPos?.cancel();
+    _subPedidos?.cancel();
     _subCorrida?.cancel();
     super.dispose();
   }
 
+  void _aviso(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+  }
+
   Future<void> _carregarIcones() async {
     try {
+      final carro = await _criarIcone(Icons.directions_car, _verde);
       final pessoa = await _criarIcone(Icons.person, Colors.blue.shade700);
-      final carro =
-          await _criarIcone(Icons.directions_car, Colors.green.shade700);
       if (!mounted) return;
       setState(() {
-        _iconePessoa = pessoa;
         _iconeCarro = carro;
+        _iconePessoa = pessoa;
       });
     } catch (_) {}
   }
 
-  void _aviso(String msg, {int segundos = 4}) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), duration: Duration(seconds: segundos)),
-    );
-  }
+  // ---------- Localização ----------
 
-  Future<void> _localizar() async {
+  Future<void> _iniciarLocalizacao() async {
     var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
     }
     if (perm == LocationPermission.denied ||
-        perm == LocationPermission.deniedForever) return;
-    final p = await Geolocator.getCurrentPosition();
-    final ll = LatLng(p.latitude, p.longitude);
+        perm == LocationPermission.deniedForever) {
+      _aviso('Permita o acesso à localização para usar o app.');
+      return;
+    }
+    try {
+      final p = await Geolocator.getCurrentPosition();
+      _novaPosicao(p, centralizar: true);
+    } catch (_) {}
+    _subPos = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
+    ).listen((p) => _novaPosicao(p));
+  }
+
+  void _novaPosicao(Position p, {bool centralizar = false}) {
     if (!mounted) return;
-    setState(() => _posicao = ll);
-    _mapa?.animateCamera(CameraUpdate.newLatLngZoom(ll, 15));
+    final ll = LatLng(p.latitude, p.longitude);
+    setState(() => _eu = ll);
+    if (centralizar) {
+      _mapa?.animateCamera(CameraUpdate.newLatLngZoom(ll, 15));
+    }
+    _enviarPosicao(ll);
+    _atualizarRota();
+  }
+
+  // Manda a posição para o passageiro acompanhar (no máximo a cada 4 s).
+  Future<void> _enviarPosicao(LatLng ll, {bool agora = false}) async {
+    final status = _corrida?['status'];
+    if (_corridaId == null ||
+        (status != 'aceita' && status != 'em_andamento')) return;
+    final t = DateTime.now();
+    if (!agora && t.difference(_ultimoEnvio).inSeconds < 4) return;
+    _ultimoEnvio = t;
+    try {
+      await _db.collection('corridas').doc(_corridaId).update({
+        'motoristaPos': GeoPoint(ll.latitude, ll.longitude),
+        'motoristaPosEm': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
+  }
+
+  // ---------- Online / pedidos ----------
+
+  void _alternarOnline() {
+    setState(() => _online = !_online);
+    if (_online) {
+      _primeiraLista = true;
+      _vistos.clear();
+      _subPedidos = _db
+          .collection('corridas')
+          .where('status', isEqualTo: 'solicitada')
+          .snapshots()
+          .listen(_novosPedidos, onError: (_) {});
+    } else {
+      _subPedidos?.cancel();
+      _subPedidos = null;
+    }
+  }
+
+  void _novosPedidos(QuerySnapshot<Map<String, dynamic>> snap) {
+    var novo = false;
+    for (final d in snap.docs) {
+      if (_vistos.add(d.id) && !_primeiraLista) novo = true;
+    }
+    _primeiraLista = false;
+    if (novo && _online && _corridaId == null) _alertar();
+  }
+
+  Future<void> _alertar() async {
+    _tocarSom();
+    HapticFeedback.heavyImpact();
+    await Future.delayed(const Duration(milliseconds: 350));
+    HapticFeedback.heavyImpact();
+  }
+
+  // ---------- Corrida ----------
+
+  // Se o app foi fechado no meio de uma corrida, retoma ela.
+  Future<void> _retomarCorrida() async {
+    try {
+      final q = await _db
+          .collection('corridas')
+          .where('motoristaId', isEqualTo: _uid)
+          .get();
+      if (!mounted) return;
+      for (final d in q.docs) {
+        final s = d.data()['status'];
+        if (s == 'aceita' || s == 'em_andamento') {
+          _acompanhar(d.id);
+          break;
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _aceitar(String id) async {
+    setState(() => _aceitando = true);
+    try {
+      final ref = _db.collection('corridas').doc(id);
+      await _db.runTransaction((tx) async {
+        final snap = await tx.get(ref);
+        if (snap.data()?['status'] != 'solicitada') {
+          throw 'Essa corrida já foi aceita por outro motorista.';
+        }
+        tx.update(ref, {'status': 'aceita', 'motoristaId': _uid});
+      });
+      _acompanhar(id);
+    } catch (e) {
+      _aviso(e is String ? e : 'Não foi possível aceitar: $e');
+    } finally {
+      if (mounted) setState(() => _aceitando = false);
+    }
+  }
+
+  void _acompanhar(String id) {
+    _subCorrida?.cancel();
+    setState(() {
+      _corridaId = id;
+      _corrida = null;
+      _statusAnterior = null;
+      _rota = null;
+      _rotaOrigem = null;
+    });
+    _subCorrida =
+        _db.collection('corridas').doc(id).snapshots().listen((doc) {
+      final d = doc.data();
+      if (d == null || !mounted) return;
+      final status = d['status'] as String?;
+      if (status == 'cancelada') {
+        _encerrar('A corrida foi cancelada.');
+        return;
+      }
+      if (status == 'finalizada') {
+        final v = d['valor'];
+        _encerrar(v is num
+            ? 'Corrida finalizada. Receba ${_real(v)} do passageiro.'
+            : 'Corrida finalizada.');
+        return;
+      }
+      final mudou = status != _statusAnterior;
+      setState(() {
+        _corrida = d;
+        _statusAnterior = status;
+        if (mudou) {
+          _rota = null;
+          _rotaOrigem = null;
+        }
+      });
+      if (mudou) {
+        if (_eu != null) _enviarPosicao(_eu!, agora: true);
+        _atualizarRota(forcar: true);
+      }
+    }, onError: (_) {});
+  }
+
+  void _encerrar(String msg) {
+    _subCorrida?.cancel();
+    _subCorrida = null;
+    setState(() {
+      _corridaId = null;
+      _corrida = null;
+      _statusAnterior = null;
+      _rota = null;
+      _rotaOrigem = null;
+    });
+    _aviso(msg);
+    if (_eu != null) {
+      _mapa?.animateCamera(CameraUpdate.newLatLngZoom(_eu!, 15));
+    }
+  }
+
+  Future<void> _mudarStatus(String status) async {
+    try {
+      await _db
+          .collection('corridas')
+          .doc(_corridaId)
+          .update({'status': status});
+    } catch (e) {
+      _aviso('Não foi possível atualizar a corrida: $e');
+    }
+  }
+
+  Future<void> _confirmarCancelamento() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Cancelar corrida?'),
+        content: const Text('O passageiro será avisado.'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c, false),
+              child: const Text('Voltar')),
+          FilledButton(
+              onPressed: () => Navigator.pop(c, true),
+              child: const Text('Cancelar corrida')),
+        ],
+      ),
+    );
+    if (ok == true) _mudarStatus('cancelada');
+  }
+
+  // ---------- Rota ----------
+
+  LatLng? get _alvo {
+    final c = _corrida;
+    if (c == null) return null;
+    if (c['status'] == 'aceita') return _ll(c['origem']);
+    if (c['status'] == 'em_andamento') return _ll(c['destino']);
+    return null;
+  }
+
+  // Rota pelas ruas até o passageiro (ou até o destino). Recalcula só se
+  // o motorista andou mais de 200 m, e no máximo a cada 10 segundos.
+  Future<void> _atualizarRota({bool forcar = false}) async {
+    final alvo = _alvo;
+    if (_buscandoRota || _eu == null || alvo == null) return;
+    final agora = DateTime.now();
+    if (!forcar && agora.difference(_rotaTentativa).inSeconds < 10) return;
+    final longe = _rotaOrigem == null ||
+        Geolocator.distanceBetween(_rotaOrigem!.latitude,
+                _rotaOrigem!.longitude, _eu!.latitude, _eu!.longitude) >
+            200;
+    if (!forcar && _rota != null && !longe) return;
+    _rotaTentativa = agora;
+    _buscandoRota = true;
+    final status = _corrida?['status'];
+    final origem = _eu!;
+    final exata = await buscarRota(origem, alvo);
+    _buscandoRota = false;
+    if (!mounted || _corrida?['status'] != status) return;
+    final rota = exata ?? rotaEstimada(origem, alvo);
+    final primeira = _rota == null;
+    _rotaOrigem = origem;
+    setState(() => _rota = rota);
+    if (primeira) _ajustarCamera([origem, alvo, ...rota.pontos]);
   }
 
   void _ajustarCamera(List<LatLng> pts) {
@@ -178,182 +457,32 @@ class _HomePageState extends State<HomePage> {
           southwest: LatLng(minLat, minLng),
           northeast: LatLng(maxLat, maxLng),
         ),
-        60,
+        70,
       ));
     } catch (_) {}
   }
 
-  // Passo 1: acha o destino, traça a rota pelas ruas e calcula o valor.
-  Future<void> _calcular() async {
-    if (_posicao == null || _destino.text.trim().isEmpty) return;
-    setState(() => _calculando = true);
-    try {
-      final texto = _destino.text.trim();
-      final locs = await locationFromAddress('$texto, Pirapora, MG');
-      if (locs.isEmpty) throw 'Endereço não encontrado';
-      final destino = LatLng(locs.first.latitude, locs.first.longitude);
-
-      final exata = await buscarRota(_posicao!, destino);
-      final rota = exata ?? rotaEstimada(_posicao!, destino);
-      if (!mounted) return;
-
-      setState(() {
-        _destinoLL = destino;
-        _destinoTexto = texto;
-        _rota = rota;
-        _valor = _calcularValor(rota.metros / 1000);
-      });
-      _ajustarCamera([_posicao!, destino, ...rota.pontos]);
-      if (exata == null) {
-        _aviso(
-          'Não consegui traçar a rota pelas ruas ($erroRota). Valor estimado.',
-          segundos: 10,
-        );
-      }
-    } catch (e) {
-      _aviso('$e');
-    } finally {
-      if (mounted) setState(() => _calculando = false);
+  void _verRota() {
+    final alvo = _alvo;
+    if (_eu != null && alvo != null) {
+      _ajustarCamera([_eu!, alvo, ...?_rota?.pontos]);
+    } else if (_eu != null) {
+      _mapa?.animateCamera(CameraUpdate.newLatLngZoom(_eu!, 15));
     }
   }
 
-  // Passo 2: confirma o pedido com a forma de pagamento escolhida.
-  Future<void> _pedirCorrida() async {
-    if (_posicao == null ||
-        _destinoLL == null ||
-        _rota == null ||
-        _valor == null ||
-        _pagamento == null) return;
-    setState(() => _pedindo = true);
-    try {
-      final ref = await _db.collection('corridas').add({
-        'passageiroId': _uid,
-        'motoristaId': null,
-        'origem': GeoPoint(_posicao!.latitude, _posicao!.longitude),
-        'destino': GeoPoint(_destinoLL!.latitude, _destinoLL!.longitude),
-        'destinoTexto': _destinoTexto,
-        'distanciaKm': double.parse((_rota!.metros / 1000).toStringAsFixed(2)),
-        'valor': _valor,
-        'pagamento': _pagamento,
-        'status': 'solicitada',
-        'criadoEm': FieldValue.serverTimestamp(),
-      });
-      _limparAcompanhamento();
-      setState(() => _corridaId = ref.id);
-      _ouvirCorrida(ref.id);
-    } catch (e) {
-      _aviso('Não foi possível pedir a corrida: $e', segundos: 10);
-    } finally {
-      if (mounted) setState(() => _pedindo = false);
-    }
-  }
-
-  void _limparAcompanhamento() {
-    _subCorrida?.cancel();
-    _subCorrida = null;
-    _status = null;
-    _motorista = null;
-    _rotaMotorista = null;
-    _rotaOrigem = null;
-    _rotaTentativa = DateTime.fromMillisecondsSinceEpoch(0);
-  }
-
-  // Fica ouvindo a corrida: status e posição do motorista.
-  void _ouvirCorrida(String id) {
-    _subCorrida = _db.collection('corridas').doc(id).snapshots().listen((doc) {
-      final d = doc.data();
-      if (d == null || !mounted) return;
-      final status = d['status'] as String;
-      final gp = d['motoristaPos'];
-      final pos = gp is GeoPoint ? LatLng(gp.latitude, gp.longitude) : null;
-      final anterior = _status;
-      setState(() {
-        _status = status;
-        _motorista = pos;
-        if (status != 'aceita') _rotaMotorista = null;
-      });
-      if (status == 'aceita' && pos != null) {
-        _atualizarRotaMotorista(pos);
-      }
-      if (status == 'em_andamento' &&
-          anterior != 'em_andamento' &&
-          _rota != null) {
-        _ajustarCamera(_rota!.pontos);
-      }
-    });
-  }
-
-  // Rota do motorista até o passageiro. Recalcula só se o motorista andou
-  // mais de 200 m, e no máximo a cada 10 segundos.
-  Future<void> _atualizarRotaMotorista(LatLng pos) async {
-    if (_buscandoRota || _posicao == null) return;
-    final agora = DateTime.now();
-    if (agora.difference(_rotaTentativa).inSeconds < 10) return;
-    final longe = _rotaOrigem == null ||
-        Geolocator.distanceBetween(_rotaOrigem!.latitude,
-                _rotaOrigem!.longitude, pos.latitude, pos.longitude) >
-            200;
-    if (_rotaMotorista != null && !longe) return;
-    _rotaTentativa = agora;
-    _buscandoRota = true;
-    final exata = await buscarRota(pos, _posicao!);
-    _buscandoRota = false;
-    if (!mounted || _status != 'aceita') return;
-    final rota = exata ?? rotaEstimada(pos, _posicao!);
-    final primeira = _rotaMotorista == null;
-    _rotaOrigem = pos;
-    setState(() => _rotaMotorista = rota);
-    if (primeira) _ajustarCamera([pos, _posicao!, ...rota.pontos]);
-  }
-
-  void _alterarDestino() {
-    setState(() {
-      _rota = null;
-      _destinoLL = null;
-      _valor = null;
-    });
-    if (_posicao != null) {
-      _mapa?.animateCamera(CameraUpdate.newLatLngZoom(_posicao!, 15));
-    }
-  }
-
-  Future<void> _cancelar() async {
-    await _db
-        .collection('corridas')
-        .doc(_corridaId)
-        .update({'status': 'cancelada'});
-  }
-
-  void _novaCorrida() {
-    _destino.clear();
-    _limparAcompanhamento();
-    setState(() {
-      _corridaId = null;
-      _rota = null;
-      _destinoLL = null;
-      _valor = null;
-    });
-    if (_posicao != null) {
-      _mapa?.animateCamera(CameraUpdate.newLatLngZoom(_posicao!, 15));
-    }
-  }
+  // ---------- Tela ----------
 
   @override
   Widget build(BuildContext context) {
-    final emCorrida = _status == 'aceita' || _status == 'em_andamento';
-    final mostrarRotaMotorista = _status == 'aceita' &&
-        _rotaMotorista != null &&
-        !_rotaMotorista!.estimada;
+    final status = _corrida?['status'];
+    final origem = _ll(_corrida?['origem']);
+    final destino = _ll(_corrida?['destino']);
+    final corRota = status == 'aceita' ? Colors.green : _azul;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('PiraCar'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () => FirebaseAuth.instance.signOut(),
-          ),
-        ],
-      ),
+      key: _scaffold,
+      drawer: _menu(),
       body: Stack(
         children: [
           GoogleMap(
@@ -361,184 +490,393 @@ class _HomePageState extends State<HomePage> {
                 const CameraPosition(target: _centroPirapora, zoom: 13),
             myLocationEnabled: false,
             myLocationButtonEnabled: false,
-            padding: EdgeInsets.only(bottom: _rota != null ? 340 : 170),
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            padding: const EdgeInsets.only(top: 90, bottom: 280),
             polylines: {
-              if (mostrarRotaMotorista)
-                Polyline(
-                  polylineId: const PolylineId('motorista'),
-                  points: _rotaMotorista!.pontos,
-                  width: 6,
-                  color: Colors.green,
-                )
-              else if (_rota != null && !_rota!.estimada && _status != 'aceita')
+              if (_rota != null && !_rota!.estimada)
                 Polyline(
                   polylineId: const PolylineId('rota'),
                   points: _rota!.pontos,
                   width: 6,
-                  color: Colors.blue,
+                  color: corRota,
                 ),
             },
             markers: {
-              if (_posicao != null)
+              if (_eu != null)
                 Marker(
-                  markerId: const MarkerId('passageiro'),
-                  position: _posicao!,
-                  icon: _iconePessoa,
-                  anchor: const Offset(0.5, 0.5),
-                  zIndex: 2,
-                  infoWindow: const InfoWindow(title: 'Você'),
-                ),
-              if (_destinoLL != null)
-                Marker(
-                  markerId: const MarkerId('destino'),
-                  position: _destinoLL!,
-                  infoWindow: InfoWindow(title: _destinoTexto),
-                ),
-              if (_motorista != null && emCorrida)
-                Marker(
-                  markerId: const MarkerId('motorista'),
-                  position: _motorista!,
+                  markerId: const MarkerId('eu'),
+                  position: _eu!,
                   icon: _iconeCarro,
                   anchor: const Offset(0.5, 0.5),
                   zIndex: 3,
-                  infoWindow: const InfoWindow(title: 'Motorista'),
+                  infoWindow: const InfoWindow(title: 'Você'),
+                ),
+              if (status == 'aceita' && origem != null)
+                Marker(
+                  markerId: const MarkerId('passageiro'),
+                  position: origem,
+                  icon: _iconePessoa,
+                  anchor: const Offset(0.5, 0.5),
+                  zIndex: 2,
+                  infoWindow: const InfoWindow(title: 'Passageiro'),
+                ),
+              if (destino != null)
+                Marker(
+                  markerId: const MarkerId('destino'),
+                  position: destino,
+                  infoWindow: InfoWindow(
+                      title: (_corrida?['destinoTexto'] ?? 'Destino')
+                          .toString()),
                 ),
             },
-            onMapCreated: (c) => _mapa = c,
+            onMapCreated: (c) {
+              _mapa = c;
+              if (_eu != null) {
+                c.animateCamera(CameraUpdate.newLatLngZoom(_eu!, 15));
+              }
+            },
           ),
-          Align(
-            alignment: Alignment.bottomCenter,
-            child: Card(
-              margin: const EdgeInsets.all(12),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: _corridaId != null
-                    ? _painelCorrida()
-                    : (_rota != null ? _resumo() : _formDestino()),
+          Positioned(top: 0, left: 0, right: 0, child: _barraTopo()),
+          Positioned(
+            right: 12,
+            bottom: 300,
+            child: Column(
+              children: [
+                _botaoRedondo(Icons.my_location, () {
+                  if (_eu != null) {
+                    _mapa?.animateCamera(
+                        CameraUpdate.newLatLngZoom(_eu!, 16));
+                  }
+                }),
+                const SizedBox(height: 10),
+                _botaoRedondo(Icons.add,
+                    () => _mapa?.animateCamera(CameraUpdate.zoomIn())),
+                const SizedBox(height: 10),
+                _botaoRedondo(Icons.remove,
+                    () => _mapa?.animateCamera(CameraUpdate.zoomOut())),
+                const SizedBox(height: 10),
+                _botaoRedondo(Icons.navigation, _verRota),
+              ],
+            ),
+          ),
+          Align(alignment: Alignment.bottomCenter, child: _painelInferior()),
+        ],
+      ),
+    );
+  }
+
+  Widget _barraTopo() {
+    return SafeArea(
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(30),
+          boxShadow: const [
+            BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))
+          ],
+        ),
+        child: Row(
+          children: [
+            IconButton(
+              icon: const Icon(Icons.menu),
+              onPressed: () => _scaffold.currentState?.openDrawer(),
+            ),
+            const Text('PiraCar',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Spacer(),
+            GestureDetector(
+              onTap: _corridaId == null ? _alternarOnline : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: _online ? Colors.green : Colors.grey.shade500,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(_online ? Icons.wifi_tethering : Icons.power_settings_new,
+                        color: Colors.white, size: 18),
+                    const SizedBox(width: 6),
+                    Text(_online ? 'Online' : 'Offline',
+                        style: const TextStyle(
+                            color: Colors.white, fontWeight: FontWeight.bold)),
+                  ],
+                ),
               ),
             ),
+            const SizedBox(width: 4),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _botaoRedondo(IconData icone, VoidCallback onTap) {
+    return Material(
+      color: Colors.white,
+      shape: const CircleBorder(),
+      elevation: 4,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(11),
+          child: Icon(icone, color: Colors.black87),
+        ),
+      ),
+    );
+  }
+
+  Widget _menu() {
+    final d = widget.dados;
+    return Drawer(
+      child: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          UserAccountsDrawerHeader(
+            decoration: const BoxDecoration(color: _azul),
+            currentAccountPicture: const CircleAvatar(
+              backgroundColor: Colors.white,
+              child: Icon(Icons.person, size: 40, color: _azul),
+            ),
+            accountName: Text((d['nome'] ?? 'Motorista').toString()),
+            accountEmail: Text((d['email'] ??
+                    FirebaseAuth.instance.currentUser?.email ??
+                    '')
+                .toString()),
+          ),
+          ListTile(
+            leading: const Icon(Icons.directions_car),
+            title: Text((d['carro'] ?? '-').toString()),
+            subtitle: const Text('Carro'),
+          ),
+          ListTile(
+            leading: const Icon(Icons.badge),
+            title: Text((d['placa'] ?? '-').toString()),
+            subtitle: const Text('Placa'),
+          ),
+          const Divider(),
+          ListTile(
+            leading: const Icon(Icons.logout),
+            title: const Text('Sair'),
+            onTap: () {
+              Navigator.pop(context);
+              FirebaseAuth.instance.signOut();
+            },
           ),
         ],
       ),
     );
   }
 
-  Widget _formDestino() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        TextField(
-          controller: _destino,
-          decoration: const InputDecoration(
-            labelText: 'Para onde vamos?',
-            prefixIcon: Icon(Icons.place),
-          ),
+  Widget _painelInferior() {
+    return Container(
+      width: double.infinity,
+      constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.45),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              margin: const EdgeInsets.only(top: 10, bottom: 6),
+              width: 44,
+              height: 5,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade400,
+                borderRadius: BorderRadius.circular(3),
+              ),
+            ),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                child: _corridaId != null
+                    ? _painelCorrida()
+                    : (_online ? _listaPedidos() : _painelOffline()),
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _painelOffline() {
+    return Column(
+      children: [
+        const Text('Você está offline',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        const Text('Fique online para receber pedidos de corrida.'),
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
           child: FilledButton(
-            onPressed: _calculando || _posicao == null ? null : _calcular,
-            child: Text(_posicao == null
-                ? 'Obtendo localização...'
-                : (_calculando ? 'Calculando...' : 'Ver valor da corrida')),
+            onPressed: _alternarOnline,
+            child: const Text('Ficar online'),
           ),
         ),
       ],
     );
   }
 
-  Widget _resumo() {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Destino: $_destinoTexto',
-            style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 2),
-        Text(_rota!.resumo),
-        const SizedBox(height: 4),
-        Text(
-          'Valor: ${_real(_valor!)}',
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-        Text(
-          'Até 3 km: ${_real(_valorBase)} • depois ${_real(_precoKmExtra)} por km',
-          style: const TextStyle(fontSize: 12, color: Colors.black54),
-        ),
-        const SizedBox(height: 10),
-        const Text('Forma de pagamento'),
-        const SizedBox(height: 6),
-        Wrap(
-          spacing: 8,
+  Widget _listaPedidos() {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: _db
+          .collection('corridas')
+          .where('status', isEqualTo: 'solicitada')
+          .snapshots(),
+      builder: (context, snap) {
+        if (snap.hasError) {
+          return Text('Erro ao carregar pedidos: ${snap.error}');
+        }
+        if (!snap.hasData) return const LinearProgressIndicator();
+        final docs = snap.data!.docs;
+        if (docs.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              children: [
+                Icon(Icons.search, size: 36, color: Colors.black45),
+                SizedBox(height: 6),
+                Text('Aguardando pedidos de corrida...'),
+              ],
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final e in _formas.entries)
-              ChoiceChip(
-                avatar: Icon(_icones[e.key], size: 18),
-                label: Text(e.value),
-                selected: _pagamento == e.key,
-                onSelected: (_) => setState(() => _pagamento = e.key),
+            Text('Pedidos (${docs.length})',
+                style: const TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            for (final doc in docs) _cartaoPedido(doc.id, doc.data()),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _cartaoPedido(String id, Map<String, dynamic> d) {
+    final origem = _ll(d['origem']);
+    String? ateVoce;
+    if (origem != null && _eu != null) {
+      final m = Geolocator.distanceBetween(_eu!.latitude, _eu!.longitude,
+          origem.latitude, origem.longitude);
+      ateVoce = 'Passageiro a ${(m / 1000).toStringAsFixed(1)} km de você';
+    }
+    final valor = d['valor'];
+    final km = d['distanciaKm'];
+    final forma = _nomesPagamento[d['pagamento']];
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Para: ${d['destinoTexto'] ?? '-'}',
+                      style: const TextStyle(fontWeight: FontWeight.bold)),
+                  if (km is num) Text('Corrida de ${km.toStringAsFixed(1)} km'),
+                  if (ateVoce != null)
+                    Text(ateVoce,
+                        style: const TextStyle(color: Colors.black54)),
+                  if (forma != null)
+                    Text(forma,
+                        style: const TextStyle(color: Colors.black54)),
+                ],
               ),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              children: [
+                if (valor is num)
+                  Text(_real(valor),
+                      style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: _verde)),
+                const SizedBox(height: 4),
+                FilledButton(
+                  onPressed: _aceitando ? null : () => _aceitar(id),
+                  child: const Text('Aceitar'),
+                ),
+              ],
+            ),
           ],
         ),
-        const SizedBox(height: 6),
-        const Text(
-          'O pagamento é feito direto ao motorista no fim da corrida.',
-          style: TextStyle(fontSize: 12, color: Colors.black54),
-        ),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: FilledButton(
-            onPressed: _pedindo || _pagamento == null ? null : _pedirCorrida,
-            child: Text(_pagamento == null
-                ? 'Escolha a forma de pagamento'
-                : 'Pedir corrida'),
-          ),
-        ),
-        Center(
-          child: TextButton(
-            onPressed: _alterarDestino,
-            child: const Text('Alterar destino'),
-          ),
-        ),
-      ],
+      ),
     );
   }
 
   Widget _painelCorrida() {
-    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
-      stream: _db.collection('corridas').doc(_corridaId).snapshots(),
-      builder: (context, snap) {
-        final dados = snap.data?.data();
-        if (dados == null) return const LinearProgressIndicator();
-        final status = dados['status'] as String;
-        final encerrada = status == 'finalizada' || status == 'cancelada';
-        final valor = (dados['valor'] as num?)?.toDouble();
-        final forma = _nomesPagamento[dados['pagamento']];
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(_statusTexto[status] ?? status,
-                style: Theme.of(context).textTheme.titleMedium),
-            if (status == 'aceita')
-              Text(_rotaMotorista != null
-                  ? 'Motorista a ${_rotaMotorista!.resumo}'
-                  : 'Localizando o motorista...'),
-            const SizedBox(height: 4),
-            Text('Destino: ${dados['destinoTexto']}'),
-            if (valor != null)
-              Text('${_real(valor)}${forma != null ? ' • $forma' : ''}'),
-            const SizedBox(height: 12),
-            if (encerrada)
-              FilledButton(
-                  onPressed: _novaCorrida, child: const Text('Nova corrida'))
-            else if (status == 'solicitada' || status == 'aceita')
-              OutlinedButton(
-                  onPressed: _cancelar, child: const Text('Cancelar corrida')),
-          ],
-        );
-      },
+    final c = _corrida;
+    if (c == null) return const LinearProgressIndicator();
+    final status = c['status'];
+    final valor = c['valor'];
+    final forma = _nomesPagamento[c['pagamento']];
+    final indoBuscar = status == 'aceita';
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(indoBuscar ? 'Indo buscar o passageiro' : 'Corrida em andamento',
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 2),
+        Text(_rota == null
+            ? 'Calculando rota...'
+            : '${indoBuscar ? 'Passageiro' : 'Destino'} a ${_rota!.resumo}'),
+        const SizedBox(height: 6),
+        Text('Destino: ${c['destinoTexto'] ?? '-'}'),
+        if (valor is num)
+          Text(
+            'Você recebe: ${_real(valor)}${forma != null ? ' • $forma' : ''}',
+            style: const TextStyle(
+                fontSize: 16, fontWeight: FontWeight.bold, color: _verde),
+          ),
+        const Text('O pagamento é feito direto pelo passageiro no fim.',
+            style: TextStyle(fontSize: 12, color: Colors.black54)),
+        const SizedBox(height: 12),
+        if (indoBuscar) ...[
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: () => _mudarStatus('em_andamento'),
+              child: const Text('Iniciar corrida'),
+            ),
+          ),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: _confirmarCancelamento,
+              child: const Text('Cancelar corrida'),
+            ),
+          ),
+        ] else
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              style: FilledButton.styleFrom(backgroundColor: _verde),
+              onPressed: () => _mudarStatus('finalizada'),
+              child: const Text('Finalizar corrida'),
+            ),
+          ),
+      ],
     );
   }
 }
