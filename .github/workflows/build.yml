@@ -26,6 +26,20 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Certificado fixo de assinatura
+        env:
+          KEYSTORE: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+        run: |
+          # Assina sempre com o mesmo certificado, para o SHA-1 cadastrado
+          # no Firebase (login com Google) valer em todos os builds.
+          if [ -n "$KEYSTORE" ]; then
+            mkdir -p ~/.android
+            echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
+            keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep -E "SHA1|SHA256"
+          else
+            echo "::warning::Secret DEBUG_KEYSTORE_BASE64 não configurado; o APK sai com um certificado temporário."
+          fi
+
       - name: Gerar projeto Android
         run: |
           mkdir /tmp/bak && cp -r lib pubspec.yaml /tmp/bak/
