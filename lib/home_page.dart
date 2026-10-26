@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
+import 'cadastro_veiculo.dart';
 import 'rota.dart';
 
 const _azul = Color(0xFF1E88E5);
@@ -74,7 +75,15 @@ class HomePage extends StatelessWidget {
           return const Scaffold(
               body: Center(child: CircularProgressIndicator()));
         }
+        if (!snap.data!.exists) {
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
+        }
         final dados = snap.data!.data() ?? {};
+        final incompleto = dados['temCnh'] != true ||
+            (dados['cor'] ?? '').toString().trim().isEmpty ||
+            (dados['placa'] ?? '').toString().trim().isEmpty;
+        if (incompleto) return CompletarCadastroPage(dados: dados);
         if (dados['aprovado'] != true) return const _EmAnalise();
         return _MapaMotorista(dados: dados);
       },
@@ -674,7 +683,9 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
           ),
           ListTile(
             leading: const Icon(Icons.directions_car),
-            title: Text((d['carro'] ?? '-').toString()),
+            title: Text([d['carro'], d['cor']]
+                .where((v) => (v ?? '').toString().trim().isNotEmpty)
+                .join(' • ')),
             subtitle: const Text('Carro'),
           ),
           ListTile(
