@@ -1086,7 +1086,17 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
                 child: _corridaId != null
                     ? _painelCorrida()
                     : (_online
-                        ? (_oferta != null ? _cartaoOferta() : _aguardando())
+                        ? (_oferta != null
+                            ? _cartaoOferta()
+                            : PainelOnline(
+                                uid: _uid,
+                                saldo: _saldo,
+                                aviso: avisoTokens,
+                                onOffline: () {
+                                  if (_online) _alternarOnline();
+                                },
+                                onLoja: _abrirLoja,
+                              ))
                         : _painelOffline()),
               ),
             ),
@@ -1105,24 +1115,6 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
         if (!_online) _alternarOnline();
       },
       onLoja: _abrirLoja,
-    );
-  }
-
-  Widget _aguardando() {
-    return const Padding(
-      padding: EdgeInsets.symmetric(vertical: 12),
-      child: Column(
-        children: [
-          SizedBox(
-            width: 30,
-            height: 30,
-            child: CircularProgressIndicator(strokeWidth: 3),
-          ),
-          SizedBox(height: 10),
-          Text('Procurando corridas...',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-        ],
-      ),
     );
   }
 
