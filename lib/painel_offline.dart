@@ -79,41 +79,7 @@ class PainelOffline extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-          stream: FirebaseFirestore.instance
-              .collection('corridas')
-              .where('motoristaId', isEqualTo: uid)
-              .snapshots(),
-          builder: (context, snap) {
-            final hoje = DateTime.now();
-            var corridas = 0;
-            double ganhos = 0;
-            for (final d in snap.data?.docs ?? const []) {
-              final c = d.data();
-              final t = c['criadoEm'];
-              if (c['status'] != 'finalizada' || t is! Timestamp) continue;
-              final dt = t.toDate();
-              if (dt.year != hoje.year ||
-                  dt.month != hoje.month ||
-                  dt.day != hoje.day) continue;
-              corridas++;
-              final v = c['valor'];
-              if (v is num) ganhos += v;
-            }
-            return Row(
-              children: [
-                Expanded(child: _Mini('Ganhos hoje', _real(ganhos))),
-                const SizedBox(width: 8),
-                Expanded(child: _Mini('Corridas hoje', '$corridas')),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: _Mini('Tokens', '$saldo',
-                      alerta: saldo <= aviso, onTap: onLoja),
-                ),
-              ],
-            );
-          },
-        ),
+        ResumoDia(uid: uid, saldo: saldo, aviso: aviso, onLoja: onLoja),
         const SizedBox(height: 14),
         if (semTokens)
           SizedBox(
@@ -139,6 +105,189 @@ class PainelOffline extends StatelessWidget {
             child: const Text('Saldo baixo, comprar tokens'),
           ),
       ],
+    );
+  }
+}
+
+/// Ganhos hoje, corridas hoje e tokens.
+class ResumoDia extends StatelessWidget {
+  const ResumoDia({
+    super.key,
+    required this.uid,
+    required this.saldo,
+    required this.aviso,
+    required this.onLoja,
+  });
+
+  final String uid;
+  final int saldo;
+  final int aviso;
+  final VoidCallback onLoja;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('corridas')
+          .where('motoristaId', isEqualTo: uid)
+          .snapshots(),
+      builder: (context, snap) {
+        final hoje = DateTime.now();
+        var corridas = 0;
+        double ganhos = 0;
+        for (final d in snap.data?.docs ?? const []) {
+          final c = d.data();
+          final t = c['criadoEm'];
+          if (c['status'] != 'finalizada' || t is! Timestamp) continue;
+          final dt = t.toDate();
+          if (dt.year != hoje.year ||
+              dt.month != hoje.month ||
+              dt.day != hoje.day) continue;
+          corridas++;
+          final v = c['valor'];
+          if (v is num) ganhos += v;
+        }
+        return Row(
+          children: [
+            Expanded(child: _Mini('Ganhos hoje', _real(ganhos))),
+            const SizedBox(width: 8),
+            Expanded(child: _Mini('Corridas hoje', '$corridas')),
+            const SizedBox(width: 8),
+            Expanded(
+              child: _Mini('Tokens', '$saldo',
+                  alerta: saldo <= aviso, onTap: onLoja),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Painel "Você está online": procurando corridas + botão Ficar offline.
+class PainelOnline extends StatelessWidget {
+  const PainelOnline({
+    super.key,
+    required this.uid,
+    required this.saldo,
+    required this.aviso,
+    required this.onOffline,
+    required this.onLoja,
+  });
+
+  final String uid;
+  final int saldo;
+  final int aviso;
+  final VoidCallback onOffline;
+  final VoidCallback onLoja;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _azulNoite,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            children: [
+              const _Pulso(),
+              const SizedBox(width: 14),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Você está online',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800)),
+                    SizedBox(height: 3),
+                    Text('Procurando corridas perto de você...',
+                        style: TextStyle(
+                            color: Color(0xFFC9D6EA), fontSize: 13.5)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        ResumoDia(uid: uid, saldo: saldo, aviso: aviso, onLoja: onLoja),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 58,
+          child: OutlinedButton.icon(
+            onPressed: onOffline,
+            style: OutlinedButton.styleFrom(
+              foregroundColor: const Color(0xFFD32F2F),
+              side: const BorderSide(color: Color(0xFFD32F2F), width: 2),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(40)),
+              textStyle:
+                  const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+            ),
+            icon: const Icon(Icons.power_settings_new),
+            label: const Text('Ficar offline'),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Bolinha verde pulsando, indicando que está procurando corridas.
+class _Pulso extends StatefulWidget {
+  const _Pulso();
+
+  @override
+  State<_Pulso> createState() => _PulsoState();
+}
+
+class _PulsoState extends State<_Pulso> with SingleTickerProviderStateMixin {
+  late final AnimationController _a = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1400))
+    ..repeat();
+
+  @override
+  void dispose() {
+    _a.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    const verde = Color(0xFF43A047);
+    return SizedBox(
+      width: 66,
+      height: 66,
+      child: AnimatedBuilder(
+        animation: _a,
+        builder: (context, _) => Stack(
+          alignment: Alignment.center,
+          children: [
+            Container(
+              width: 50 + 16 * _a.value,
+              height: 50 + 16 * _a.value,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: verde.withOpacity(0.45 * (1 - _a.value)),
+              ),
+            ),
+            Container(
+              width: 50,
+              height: 50,
+              decoration:
+                  const BoxDecoration(color: verde, shape: BoxShape.circle),
+              child: const Icon(Icons.wifi_tethering,
+                  color: Colors.white, size: 28),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
