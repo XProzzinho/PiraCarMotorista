@@ -1,0 +1,300 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+const _azulNoite = Color(0xFF0B2545);
+const _azul = Color(0xFF1E88E5);
+const _azulEscuro = Color(0xFF1565C0);
+
+String _real(num v) =>
+    'R\$ ${v.toDouble().toStringAsFixed(2).replaceAll('.', ',')}';
+
+/// Painel "Você está offline": cartão, resumo do dia e barra de deslizar.
+class PainelOffline extends StatelessWidget {
+  const PainelOffline({
+    super.key,
+    required this.uid,
+    required this.saldo,
+    required this.aviso,
+    required this.onOnline,
+    required this.onLoja,
+  });
+
+  final String uid;
+  final int saldo;
+  final int aviso;
+  final VoidCallback onOnline;
+  final VoidCallback onLoja;
+
+  @override
+  Widget build(BuildContext context) {
+    final semTokens = saldo <= 0;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: _azulNoite,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 66,
+                height: 66,
+                decoration: BoxDecoration(
+                  color: _azul,
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                        color: _azul.withOpacity(0.3), spreadRadius: 6),
+                  ],
+                ),
+                child: const Icon(Icons.power_settings_new,
+                    color: Colors.white, size: 34),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Você está offline',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 3),
+                    Text(
+                      semTokens
+                          ? 'Sem tokens. Compre mais para rodar.'
+                          : 'Pronto pra rodar em Pirapora?',
+                      style: const TextStyle(
+                          color: Color(0xFFC9D6EA), fontSize: 13.5),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+          stream: FirebaseFirestore.instance
+              .collection('corridas')
+              .where('motoristaId', isEqualTo: uid)
+              .snapshots(),
+          builder: (context, snap) {
+            final hoje = DateTime.now();
+            var corridas = 0;
+            double ganhos = 0;
+            for (final d in snap.data?.docs ?? const []) {
+              final c = d.data();
+              final t = c['criadoEm'];
+              if (c['status'] != 'finalizada' || t is! Timestamp) continue;
+              final dt = t.toDate();
+              if (dt.year != hoje.year ||
+                  dt.month != hoje.month ||
+                  dt.day != hoje.day) continue;
+              corridas++;
+              final v = c['valor'];
+              if (v is num) ganhos += v;
+            }
+            return Row(
+              children: [
+                Expanded(child: _Mini('Ganhos hoje', _real(ganhos))),
+                const SizedBox(width: 8),
+                Expanded(child: _Mini('Corridas hoje', '$corridas')),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: _Mini('Tokens', '$saldo',
+                      alerta: saldo <= aviso, onTap: onLoja),
+                ),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 14),
+        if (semTokens)
+          SizedBox(
+            height: 62,
+            child: FilledButton.icon(
+              onPressed: onLoja,
+              style: FilledButton.styleFrom(
+                backgroundColor: _azulEscuro,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(40)),
+                textStyle:
+                    const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
+              icon: const Icon(Icons.toll),
+              label: const Text('Comprar tokens'),
+            ),
+          )
+        else
+          DeslizarOnline(onConcluir: onOnline),
+        if (!semTokens && saldo <= aviso)
+          TextButton(
+            onPressed: onLoja,
+            child: const Text('Saldo baixo, comprar tokens'),
+          ),
+      ],
+    );
+  }
+}
+
+class _Mini extends StatelessWidget {
+  const _Mini(this.rotulo, this.valor, {this.alerta = false, this.onTap});
+
+  final String rotulo;
+  final String valor;
+  final bool alerta;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: alerta ? const Color(0xFFFFF3E0) : const Color(0xFFF3F4F6),
+      borderRadius: BorderRadius.circular(12),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(11, 9, 8, 9),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(rotulo,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(valor,
+                    style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: alerta
+                            ? const Color(0xFFE65100)
+                            : const Color(0xFF111111))),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Barra azul: arrastar a bolinha até o fim chama [onConcluir].
+class DeslizarOnline extends StatefulWidget {
+  const DeslizarOnline({super.key, required this.onConcluir});
+
+  final VoidCallback onConcluir;
+
+  @override
+  State<DeslizarOnline> createState() => _DeslizarOnlineState();
+}
+
+class _DeslizarOnlineState extends State<DeslizarOnline>
+    with SingleTickerProviderStateMixin {
+  static const _altura = 62.0;
+  static const _bola = 50.0;
+  double _x = 0;
+  late final AnimationController _volta = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 250))
+    ..addListener(() => setState(() => _x = _inicioVolta * (1 - _volta.value)));
+  double _inicioVolta = 0;
+
+  @override
+  void dispose() {
+    _volta.dispose();
+    super.dispose();
+  }
+
+  void _soltar(double max) {
+    if (_x >= max * 0.85) {
+      HapticFeedback.mediumImpact();
+      setState(() => _x = max);
+      widget.onConcluir();
+      Future.delayed(const Duration(milliseconds: 400), () {
+        if (mounted) setState(() => _x = 0);
+      });
+    } else {
+      _inicioVolta = _x;
+      _volta.forward(from: 0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(builder: (context, c) {
+      final max = c.maxWidth - _bola - 12;
+      final progresso = max <= 0 ? 0.0 : (_x / max).clamp(0.0, 1.0);
+      return Container(
+        height: _altura,
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(colors: [_azulEscuro, _azul]),
+          borderRadius: BorderRadius.circular(40),
+          boxShadow: [
+            BoxShadow(
+                color: _azul.withOpacity(0.35),
+                blurRadius: 16,
+                offset: const Offset(0, 6)),
+          ],
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Opacity(
+              opacity: 1 - progresso,
+              child: const Padding(
+                padding: EdgeInsets.only(left: 44),
+                child: Text.rich(
+                  TextSpan(
+                    children: [
+                      TextSpan(text: 'Deslize para ficar online'),
+                      TextSpan(
+                          text: '  ›››',
+                          style: TextStyle(color: Color(0x99FFFFFF))),
+                    ],
+                  ),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 6 + _x,
+              top: 6,
+              child: GestureDetector(
+                onHorizontalDragStart: (_) => _volta.stop(),
+                onHorizontalDragUpdate: (d) => setState(
+                    () => _x = (_x + d.delta.dx).clamp(0.0, max)),
+                onHorizontalDragEnd: (_) => _soltar(max),
+                child: Container(
+                  width: _bola,
+                  height: _bola,
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    boxShadow: [
+                      BoxShadow(color: Color(0x33000000), blurRadius: 6)
+                    ],
+                  ),
+                  child: const Icon(Icons.chevron_right_rounded,
+                      color: _azulEscuro, size: 32),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
+  }
+}
