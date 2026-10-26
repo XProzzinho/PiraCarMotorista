@@ -10,6 +10,7 @@ perms = (
     '<uses-permission android:name="android.permission.INTERNET"/>\n'
     '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n'
     '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n'
+    '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n'
     '    '
 )
 assert "<application" in t, "manifest sem <application>"
@@ -42,5 +43,9 @@ t, n = re.subn(r"minSdk\s*=?\s*flutter\.minSdkVersion", "minSdk = 23", t)
 assert n == 1, "minSdk não encontrado"
 t, n = re.subn(r"compileSdk\s*=?\s*flutter\.compileSdkVersion", "compileSdk = 35", t)
 assert n == 1, "compileSdk não encontrado"
+# desugaring exigido pelo plugin de notificações
+t, n = re.subn(r"compileOptions\s*\{", "compileOptions {\n        coreLibraryDesugaringEnabled = true", t, count=1)
+assert n == 1, "compileOptions não encontrado"
+t += '\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"\n}\n'
 bg.write_text(t)
 print("Patch Android aplicado com sucesso")
