@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
@@ -154,6 +155,16 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
   StreamSubscription<Position>? _subPos;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subPedidos;
   final Set<String> _vistos = {};
+
+  // Oferta de corrida (cartão grande, estilo Uber)
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _pedidos = [];
+  final Set<String> _recusados = {};
+  String? _ofertaId;
+  Rota? _ofertaAteMim;
+  Rota? _ofertaViagem;
+  String? _ofertaEndereco;
+  double? _ofertaNota;
+  int _ofertaNotas = 0;
   bool _primeiraLista = true;
 
   // Corrida ativa
@@ -297,6 +308,9 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     } else {
       _subPedidos?.cancel();
       _subPedidos = null;
+      _pedidos = [];
+      _recusados.clear();
+      _mostrarOferta(null);
     }
   }
 
@@ -307,6 +321,134 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     }
     _primeiraLista = false;
     if (novo && _online && _corridaId == null) _alertar();
+    // mais antigo primeiro
+    final docs = snap.docs.toList()
+      ..sort((a, b) {
+        final ta = a.data()['criadoEm'], tb = b.data()['criadoEm'];
+        if (ta is! Timestamp) return 1;
+        if (tb is! Timestamp) return -1;
+        return ta.compareTo(tb);
+      });
+    if (!mounted) return;
+    setState(() => _pedidos = docs);
+    _escolherOferta();
+  }
+
+  Map<String, dynamic>? get _oferta {
+    for (final d in _pedidos) {
+      if (d.id == _ofertaId) return d.data();
+    }
+    return null;
+  }
+
+  int get _outrosPedidos =>
+      _pedidos.where((d) => !_recusados.contains(d.id)).length -
+      (_oferta != null ? 1 : 0);
+
+  void _escolherOferta() {
+    if (!_online || _corridaId != null) return;
+    if (_oferta != null) return; // continua mostrando a atual
+    for (final d in _pedidos) {
+      if (!_recusados.contains(d.id)) {
+        _mostrarOferta(d.id);
+        return;
+      }
+    }
+    if (_ofertaId != null) _mostrarOferta(null);
+  }
+
+  void _recusarOferta() {
+    if (_ofertaId != null) _recusados.add(_ofertaId!);
+    _mostrarOferta(null);
+    _escolherOferta();
+  }
+
+  // Prepara a oferta: rota até o passageiro, rota da viagem, endereço e nota.
+  Future<void> _mostrarOferta(String? id) async {
+    if (!mounted) return;
+    setState(() {
+      _ofertaId = id;
+      _ofertaAteMim = null;
+      _ofertaViagem = null;
+      _ofertaEndereco = null;
+      _ofertaNota = null;
+      _ofertaNotas = 0;
+    });
+    final d = _oferta;
+    if (id == null || d == null) {
+      if (_eu != null && _corridaId == null) {
+        _mapa?.animateCamera(CameraUpdate.newLatLngZoom(_eu!, 15));
+      }
+      return;
+    }
+    final origem = _ll(d['origem']);
+    final destino = _ll(d['destino']);
+    final eu = _eu;
+
+    Future<void> ateMim() async {
+      if (origem == null || eu == null) return;
+      final r = await buscarRota(eu, origem) ?? rotaEstimada(eu, origem);
+      if (mounted && _ofertaId == id) setState(() => _ofertaAteMim = r);
+    }
+
+    Future<void> viagem() async {
+      if (origem == null || destino == null) return;
+      final r =
+          await buscarRota(origem, destino) ?? rotaEstimada(origem, destino);
+      if (mounted && _ofertaId == id) setState(() => _ofertaViagem = r);
+    }
+
+    Future<void> endereco() async {
+      if (origem == null) return;
+      try {
+        final l =
+            await placemarkFromCoordinates(origem.latitude, origem.longitude);
+        if (l.isEmpty) return;
+        final pm = l.first;
+        final partes = [
+          [pm.thoroughfare, pm.subThoroughfare]
+              .where((s) => (s ?? '').isNotEmpty)
+              .join(', '),
+          pm.subLocality,
+        ].where((s) => (s ?? '').isNotEmpty).toList();
+        final txt = partes.isEmpty ? (pm.street ?? '') : partes.join(' - ');
+        if (mounted && _ofertaId == id && txt.isNotEmpty) {
+          setState(() => _ofertaEndereco = txt);
+        }
+      } catch (_) {}
+    }
+
+    Future<void> nota() async {
+      final pid = d['passageiroId'];
+      if (pid is! String) return;
+      try {
+        final q = await _db
+            .collection('corridas')
+            .where('passageiroId', isEqualTo: pid)
+            .get();
+        final notas = q.docs
+            .map((x) => x.data()['avaliacaoPassageiro'])
+            .whereType<num>()
+            .toList();
+        if (!mounted || _ofertaId != id) return;
+        setState(() {
+          _ofertaNotas = notas.length;
+          _ofertaNota = notas.isEmpty
+              ? null
+              : notas.reduce((a, b) => a + b) / notas.length;
+        });
+      } catch (_) {}
+    }
+
+    await Future.wait([ateMim(), viagem(), endereco(), nota()]);
+    if (!mounted || _ofertaId != id) return;
+    _ajustarCamera([
+      if (eu != null) eu,
+      if (origem != null) origem,
+      if (destino != null) destino,
+      ...?_ofertaAteMim?.pontos,
+      ...?_ofertaViagem?.pontos,
+    ]);
   }
 
   Future<void> _alertar() async {
@@ -354,6 +496,11 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
         tx.update(ref,
             {'status': 'aceita', 'motoristaId': _uid, 'tokenCobrado': true});
         tx.update(eu, {'tokens': FieldValue.increment(-1)});
+      });
+      setState(() {
+        _ofertaId = null;
+        _ofertaAteMim = null;
+        _ofertaViagem = null;
       });
       _acompanhar(id);
     } catch (e) {
@@ -419,6 +566,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     if (_eu != null) {
       _mapa?.animateCamera(CameraUpdate.newLatLngZoom(_eu!, 15));
     }
+    _escolherOferta();
   }
 
   // Ao fim da corrida, o motorista dá de 1 a 5 estrelas ao passageiro.
@@ -545,6 +693,9 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     final origem = _ll(_corrida?['origem']);
     final destino = _ll(_corrida?['destino']);
     final corRota = status == 'aceita' ? Colors.green : _azul;
+    final oferta = _corridaId == null ? _oferta : null;
+    final ofOrigem = _ll(oferta?['origem']);
+    final ofDestino = _ll(oferta?['destino']);
 
     return Scaffold(
       key: _scaffold,
@@ -558,8 +709,24 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
             myLocationButtonEnabled: false,
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
-            padding: const EdgeInsets.only(top: 90, bottom: 280),
+            padding:
+                EdgeInsets.only(top: 90, bottom: oferta != null ? 400 : 280),
             polylines: {
+              if (oferta != null && _ofertaAteMim != null)
+                Polyline(
+                  polylineId: const PolylineId('ateMim'),
+                  points: _ofertaAteMim!.pontos,
+                  width: 5,
+                  color: Colors.grey.shade600,
+                  patterns: [PatternItem.dash(18), PatternItem.gap(10)],
+                ),
+              if (oferta != null && _ofertaViagem != null)
+                Polyline(
+                  polylineId: const PolylineId('viagem'),
+                  points: _ofertaViagem!.pontos,
+                  width: 6,
+                  color: const Color(0xFF1F2937),
+                ),
               if (_rota != null && !_rota!.estimada)
                 Polyline(
                   polylineId: const PolylineId('rota'),
@@ -587,6 +754,22 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
                   zIndex: 2,
                   infoWindow: const InfoWindow(title: 'Passageiro'),
                 ),
+              if (ofOrigem != null)
+                Marker(
+                  markerId: const MarkerId('ofertaOrigem'),
+                  position: ofOrigem,
+                  icon: _iconePessoa,
+                  anchor: const Offset(0.5, 0.5),
+                  zIndex: 2,
+                  infoWindow: const InfoWindow(title: 'Passageiro'),
+                ),
+              if (ofDestino != null)
+                Marker(
+                  markerId: const MarkerId('ofertaDestino'),
+                  position: ofDestino,
+                  infoWindow: InfoWindow(
+                      title: (oferta?['destinoTexto'] ?? 'Destino').toString()),
+                ),
               if (destino != null)
                 Marker(
                   markerId: const MarkerId('destino'),
@@ -606,7 +789,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
           Positioned(top: 0, left: 0, right: 0, child: _barraTopo()),
           Positioned(
             right: 12,
-            bottom: 300,
+            bottom: oferta != null ? 420 : 300,
             child: Column(
               children: [
                 _botaoRedondo(Icons.my_location, () {
@@ -759,7 +942,8 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     return Container(
       width: double.infinity,
       constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.45),
+          maxHeight: MediaQuery.of(context).size.height *
+              (_corridaId == null && _oferta != null ? 0.6 : 0.45)),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -784,7 +968,9 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                 child: _corridaId != null
                     ? _painelCorrida()
-                    : (_online ? _listaPedidos() : _painelOffline()),
+                    : (_online
+                        ? (_oferta != null ? _cartaoOferta() : _aguardando())
+                        : _painelOffline()),
               ),
             ),
           ],
@@ -826,96 +1012,211 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     );
   }
 
-  Widget _listaPedidos() {
-    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-      stream: _db
-          .collection('corridas')
-          .where('status', isEqualTo: 'solicitada')
-          .snapshots(),
-      builder: (context, snap) {
-        if (snap.hasError) {
-          return Text('Erro ao carregar pedidos: ${snap.error}');
-        }
-        if (!snap.hasData) return const LinearProgressIndicator();
-        final docs = snap.data!.docs;
-        if (docs.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Column(
-              children: [
-                Icon(Icons.search, size: 36, color: Colors.black45),
-                SizedBox(height: 6),
-                Text('Aguardando pedidos de corrida...'),
-              ],
-            ),
-          );
-        }
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Pedidos (${docs.length})',
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            for (final doc in docs) _cartaoPedido(doc.id, doc.data()),
-          ],
-        );
-      },
+  Widget _aguardando() {
+    return const Padding(
+      padding: EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        children: [
+          SizedBox(
+            width: 30,
+            height: 30,
+            child: CircularProgressIndicator(strokeWidth: 3),
+          ),
+          SizedBox(height: 10),
+          Text('Procurando corridas...',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+        ],
+      ),
     );
   }
 
-  Widget _cartaoPedido(String id, Map<String, dynamic> d) {
-    final origem = _ll(d['origem']);
-    String? ateVoce;
-    if (origem != null && _eu != null) {
-      final m = Geolocator.distanceBetween(_eu!.latitude, _eu!.longitude,
-          origem.latitude, origem.longitude);
-      ateVoce = 'Passageiro a ${(m / 1000).toStringAsFixed(1)} km de você';
-    }
+  String _tempo(int segundos) {
+    final min = (segundos / 60).ceil();
+    if (min < 60) return '$min min';
+    final h = min ~/ 60, m = min % 60;
+    return m == 0 ? '$h h' : '$h h $m min';
+  }
+
+  String _km(num metros) =>
+      '${(metros / 1000).toStringAsFixed(1).replaceAll('.', ',')} km';
+
+  Widget _cartaoOferta() {
+    final d = _oferta!;
+    final id = _ofertaId!;
     final valor = d['valor'];
-    final km = d['distanciaKm'];
     final forma = _nomesPagamento[d['pagamento']];
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
+    final ate = _ofertaAteMim;
+    final vg = _ofertaViagem;
+    final kmViagem = vg != null
+        ? vg.metros
+        : ((d['distanciaKm'] is num) ? (d['distanciaKm'] as num) * 1000 : null);
+    final longa = vg != null && vg.segundos > 45 * 60;
+    const cinza = TextStyle(fontSize: 14, color: Colors.black54);
+    const forte = TextStyle(fontSize: 15, fontWeight: FontWeight.w700);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text('Para: ${d['destinoTexto'] ?? '-'}',
-                      style: const TextStyle(fontWeight: FontWeight.bold)),
-                  if (km is num) Text('Corrida de ${km.toStringAsFixed(1)} km'),
-                  if (ateVoce != null)
-                    Text(ateVoce,
-                        style: const TextStyle(color: Colors.black54)),
-                  if (forma != null)
-                    Text(forma,
-                        style: const TextStyle(color: Colors.black54)),
+                  Icon(Icons.directions_car, color: Colors.white, size: 15),
+                  SizedBox(width: 4),
+                  Text('PiraCar',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 13)),
                 ],
               ),
             ),
-            const SizedBox(width: 8),
-            Column(
-              children: [
-                if (valor is num)
-                  Text(_real(valor),
-                      style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: _verde)),
-                const SizedBox(height: 4),
-                FilledButton(
-                  onPressed: _aceitando ? null : () => _aceitar(id),
-                  child: const Text('Aceitar'),
+            if (forma != null) ...[
+              const SizedBox(width: 8),
+              Text(forma,
+                  style: const TextStyle(
+                      color: _azul,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13)),
+            ],
+            const Spacer(),
+            if (_outrosPedidos > 0)
+              Padding(
+                padding: const EdgeInsets.only(right: 4),
+                child: Text('+$_outrosPedidos',
+                    style: const TextStyle(color: Colors.black45)),
+              ),
+            Material(
+              color: Colors.grey.shade200,
+              shape: const CircleBorder(),
+              child: InkWell(
+                customBorder: const CircleBorder(),
+                onTap: _aceitando ? null : _recusarOferta,
+                child: const Padding(
+                  padding: EdgeInsets.all(6),
+                  child: Icon(Icons.close, size: 20),
                 ),
-              ],
+              ),
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 8),
+        if (valor is num)
+          Text(_real(valor),
+              style: const TextStyle(
+                  fontSize: 36,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: -0.5)),
+        Row(
+          children: [
+            const Icon(Icons.star_rounded, size: 18, color: Colors.black87),
+            const SizedBox(width: 3),
+            Text(
+              _ofertaNota == null
+                  ? 'Passageiro novo'
+                  : '${_ofertaNota!.toStringAsFixed(2).replaceAll('.', ',')} '
+                      '($_ofertaNotas)',
+              style: cinza,
+            ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              SizedBox(
+                width: 22,
+                child: Column(
+                  children: [
+                    const SizedBox(height: 4),
+                    Container(
+                      width: 10,
+                      height: 10,
+                      decoration: const BoxDecoration(
+                          color: Colors.black, shape: BoxShape.circle),
+                    ),
+                    Expanded(
+                      child: Container(
+                        width: 2,
+                        margin: const EdgeInsets.symmetric(vertical: 4),
+                        color: Colors.black26,
+                      ),
+                    ),
+                    Container(width: 10, height: 10, color: Colors.black),
+                    const SizedBox(height: 22),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      ate == null
+                          ? 'Calculando distância...'
+                          : '${_tempo(ate.segundos)} (${_km(ate.metros)}) de distância',
+                      style: forte,
+                    ),
+                    Text(_ofertaEndereco ?? 'Local de embarque', style: cinza),
+                    const SizedBox(height: 14),
+                    Text(
+                      vg == null
+                          ? (kmViagem != null
+                              ? 'Viagem de ${_km(kmViagem)}'
+                              : 'Calculando viagem...')
+                          : 'Viagem de ${_tempo(vg.segundos)} (${_km(vg.metros)})',
+                      style: forte,
+                    ),
+                    Text((d['destinoTexto'] ?? 'Destino').toString(),
+                        style: cinza),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (longa) ...[
+          const SizedBox(height: 6),
+          const Row(
+            children: [
+              Icon(Icons.route, size: 18, color: Colors.black54),
+              SizedBox(width: 6),
+              Text('Viagem longa (mais de 45 min)', style: cinza),
+            ],
+          ),
+        ],
+        const SizedBox(height: 14),
+        SizedBox(
+          width: double.infinity,
+          height: 54,
+          child: FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF276EF1),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+              textStyle:
+                  const TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+            ),
+            onPressed: _aceitando ? null : () => _aceitar(id),
+            child: _aceitando
+                ? const SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2.5, color: Colors.white))
+                : const Text('Aceitar'),
+          ),
+        ),
+      ],
     );
   }
 
