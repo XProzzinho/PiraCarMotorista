@@ -16,6 +16,14 @@ const _escuro = Color(0xFF111B3A);
 const _cinza = Color(0xFF6B7385);
 const _azul = Color(0xFF1E6FEB);
 
+const _nomesPagamento = {
+  'credito': 'Cartão de crédito',
+  'debito': 'Cartão de débito',
+  'pix': 'Pix',
+};
+
+String _real(double v) => 'R\$ ${v.toStringAsFixed(2).replaceAll('.', ',')}';
+
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
@@ -37,6 +45,10 @@ class _HomePageState extends State<HomePage> {
   final Set<String> _vistos = {};
   bool _temAtiva = false;
 
+  StreamSubscription<Position>? _subPos;
+  String? _corridaPosId;
+  DateTime _ultimoEnvio = DateTime.fromMillisecondsSinceEpoch(0);
+
   @override
   void initState() {
     super.initState();
@@ -46,6 +58,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _sub?.cancel();
+    _subPos?.cancel();
     super.dispose();
   }
 
@@ -79,6 +92,43 @@ class _HomePageState extends State<HomePage> {
       FlutterRingtonePlayer().playNotification();
       HapticFeedback.vibrate();
     } catch (_) {}
+  }
+
+  // Envia a posição do motorista para a corrida ativa (o passageiro vê).
+  Future<void> _enviarPosicao(String corridaId, Position p) async {
+    try {
+      await _db.collection('corridas').doc(corridaId).update({
+        'motoristaPos': GeoPoint(p.latitude, p.longitude),
+        'motoristaPosEm': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
+  }
+
+  void _gerenciarPosicao(QueryDocumentSnapshot<Map<String, dynamic>>? ativa) {
+    if (ativa == null) {
+      _subPos?.cancel();
+      _subPos = null;
+      _corridaPosId = null;
+      return;
+    }
+    if (_corridaPosId == ativa.id) return;
+    final id = ativa.id;
+    _corridaPosId = id;
+    _subPos?.cancel();
+    Geolocator.getCurrentPosition()
+        .then((p) => _enviarPosicao(id, p))
+        .catchError((_) {});
+    _subPos = Geolocator.getPositionStream(
+      locationSettings: const LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: 10,
+      ),
+    ).listen((p) {
+      final agora = DateTime.now();
+      if (agora.difference(_ultimoEnvio).inSeconds < 4) return;
+      _ultimoEnvio = agora;
+      _enviarPosicao(id, p);
+    });
   }
 
   Future<void> _localizar() async {
@@ -391,8 +441,10 @@ class _HomePageState extends State<HomePage> {
         }
         final ativaFinal = ativa;
         _temAtiva = ativaFinal != null;
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => _garantirRota(ativaFinal));
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          _garantirRota(ativaFinal);
+          _gerenciarPosicao(ativaFinal);
+        });
 
         final markers = <Marker>{};
         if (ativaFinal != null) {
@@ -464,6 +516,8 @@ class _HomePageState extends State<HomePage> {
   Widget _painelAtiva(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     final dados = doc.data();
     final emAndamento = dados['status'] == 'em_andamento';
+    final valor = (dados['valor'] as num?)?.toDouble();
+    final forma = _nomesPagamento[dados['pagamento']];
     final botao = FilledButton.styleFrom(
       backgroundColor: _verde,
       minimumSize: const Size.fromHeight(48),
@@ -480,6 +534,12 @@ class _HomePageState extends State<HomePage> {
         const SizedBox(height: 4),
         Text('Destino: ${dados['destinoTexto']}',
             style: const TextStyle(color: _cinza)),
+        if (valor != null)
+          Text(
+            'Receber ${_real(valor)}${forma != null ? ' • $forma' : ''}',
+            style: const TextStyle(
+                fontWeight: FontWeight.w600, color: _escuro),
+          ),
         if (_rota != null)
           Text(
             emAndamento
@@ -580,10 +640,15 @@ class _HomePageState extends State<HomePage> {
             itemCount: docs.length,
             itemBuilder: (context, i) {
               final d = docs[i];
+              final valor = (d.data()['valor'] as num?)?.toDouble();
+              final forma = _nomesPagamento[d.data()['pagamento']];
               return ListTile(
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.place, color: _verde),
                 title: Text(d.data()['destinoTexto'] ?? 'Destino'),
+                subtitle: valor == null
+                    ? null
+                    : Text('${_real(valor)}${forma != null ? ' • $forma' : ''}'),
                 trailing: FilledButton(
                   style: FilledButton.styleFrom(backgroundColor: _verde),
                   onPressed: () => _aceitar(d.id),
