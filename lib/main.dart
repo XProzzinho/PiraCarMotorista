@@ -20,7 +20,7 @@ class PiraCarMotoristaApp extends StatelessWidget {
       title: 'PiraCar Motorista',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF43A047),
+        colorSchemeSeed: const Color(0xFF1E88E5),
         useMaterial3: true,
       ),
       home: StreamBuilder<User?>(
