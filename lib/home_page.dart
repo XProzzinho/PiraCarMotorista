@@ -12,6 +12,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'cadastro_veiculo.dart';
 import 'foto.dart';
 import 'foto_trocar.dart';
+import 'painel_offline.dart';
 import 'rota.dart';
 import 'tokens.dart';
 
@@ -1096,35 +1097,14 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
   }
 
   Widget _painelOffline() {
-    return Column(
-      children: [
-        const Text('Você está offline',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text(_saldo <= 0
-            ? 'Você está sem tokens. Compre mais para receber corridas.'
-            : 'Fique online para receber pedidos de corrida. '
-                'Você tem $_saldo ${_saldo == 1 ? 'token' : 'tokens'}.'),
-        const SizedBox(height: 12),
-        SizedBox(
-          width: double.infinity,
-          child: _saldo <= 0
-              ? FilledButton.icon(
-                  onPressed: _abrirLoja,
-                  icon: const Icon(Icons.toll),
-                  label: const Text('Comprar tokens'),
-                )
-              : FilledButton(
-                  onPressed: _alternarOnline,
-                  child: const Text('Ficar online'),
-                ),
-        ),
-        if (_saldo > 0 && _saldo <= avisoTokens)
-          TextButton(
-            onPressed: _abrirLoja,
-            child: const Text('Saldo baixo, comprar tokens'),
-          ),
-      ],
+    return PainelOffline(
+      uid: _uid,
+      saldo: _saldo,
+      aviso: avisoTokens,
+      onOnline: () {
+        if (!_online) _alternarOnline();
+      },
+      onLoja: _abrirLoja,
     );
   }
 
