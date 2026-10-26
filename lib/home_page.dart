@@ -219,8 +219,53 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
   void _abrirLoja() => Navigator.push(
       context, MaterialPageRoute(builder: (_) => const LojaTokensPage()));
 
+  // ---------- Presença no mapa do passageiro ----------
+  // Motorista online e livre publica a posição no próprio cadastro
+  // (online, posicao, direcao), e o app do passageiro mostra o carrinho.
+
+  Timer? _batida;
+  DateTime _ultimaPresenca = DateTime.fromMillisecondsSinceEpoch(0);
+
+  bool get _disponivel => _online && _corridaId == null;
+
+  Future<void> _publicarPresenca({bool forcar = false}) async {
+    if (!_disponivel || _eu == null) return;
+    final agora = DateTime.now();
+    if (!forcar && agora.difference(_ultimaPresenca).inSeconds < 8) return;
+    _ultimaPresenca = agora;
+    try {
+      await _db.collection('users').doc(_uid).update({
+        'online': true,
+        'posicao': GeoPoint(_eu!.latitude, _eu!.longitude),
+        'direcao': _direcao,
+        'posicaoEm': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _sairDoMapa() async {
+    try {
+      await _db.collection('users').doc(_uid).update({'online': false});
+    } catch (_) {}
+  }
+
+  void _ligarPresenca(bool ligar) {
+    _batida?.cancel();
+    _batida = null;
+    if (ligar) {
+      _publicarPresenca(forcar: true);
+      // a cada 45 s confirma que continua online, mesmo parado
+      _batida = Timer.periodic(const Duration(seconds: 45),
+          (_) => _publicarPresenca(forcar: true));
+    } else {
+      _sairDoMapa();
+    }
+  }
+
   @override
   void dispose() {
+    _batida?.cancel();
+    if (_online) _sairDoMapa();
     _subPos?.cancel();
     _subPedidos?.cancel();
     _subCorrida?.cancel();
@@ -278,6 +323,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     if (centralizar) _seguir = true;
     if (_seguir) _camera3d();
     _enviarPosicao(ll);
+    _publicarPresenca();
     _atualizarRota();
   }
 
@@ -306,6 +352,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
       return;
     }
     setState(() => _online = !_online);
+    _ligarPresenca(_online && _corridaId == null);
     if (_online) {
       _primeiraLista = true;
       _vistos.clear();
@@ -523,6 +570,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
         _ofertaAteMim = null;
         _ofertaViagem = null;
       });
+      _ligarPresenca(false); // ocupado: some do mapa do passageiro
       _acompanhar(id);
     } catch (e) {
       _aviso(e is String ? e : 'Não foi possível aceitar: $e');
@@ -587,6 +635,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     if (_eu != null) {
       _voltar3d();
     }
+    if (_online) _ligarPresenca(true); // livre de novo
     _escolherOferta();
   }
 
@@ -993,8 +1042,10 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
           ListTile(
             leading: const Icon(Icons.logout),
             title: const Text('Sair'),
-            onTap: () {
+            onTap: () async {
               Navigator.pop(context);
+              _batida?.cancel();
+              await _sairDoMapa();
               FirebaseAuth.instance.signOut();
             },
           ),

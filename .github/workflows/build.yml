@@ -61,6 +61,9 @@ jobs:
 
       - run: flutter pub get
 
+      - name: Conferir código
+        run: flutter analyze --no-pub lib 2>&1 | grep -E "^\s*error" | sed 's/^\s*/::error::/' || true
+
       - name: Compilar APK
         env:
           MAPS_KEY: ${{ secrets.MAPS_API_KEY }}
