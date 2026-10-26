@@ -10,6 +10,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'cadastro_veiculo.dart';
 import 'rota.dart';
+import 'tokens.dart';
 
 const _azul = Color(0xFF1E88E5);
 const _verde = Color(0xFF2E7D32);
@@ -175,7 +176,29 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     _carregarIcones();
     _iniciarLocalizacao();
     _retomarCorrida();
+    iniciarNotificacoes();
   }
+
+  int get _saldo => saldoTokens(widget.dados);
+
+  // Acompanha o saldo: avisa quando estiver acabando e deixa offline ao zerar.
+  @override
+  void didUpdateWidget(covariant _MapaMotorista antigo) {
+    super.didUpdateWidget(antigo);
+    final antes = saldoTokens(antigo.dados);
+    final agora = _saldo;
+    if (agora < antes && agora <= avisoTokens) notificarTokens(agora);
+    if (agora <= 0 && _online) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_online) return;
+        _alternarOnline();
+        _aviso('Seus tokens acabaram. Compre mais na loja para ficar online.');
+      });
+    }
+  }
+
+  void _abrirLoja() => Navigator.push(
+      context, MaterialPageRoute(builder: (_) => const LojaTokensPage()));
 
   @override
   void dispose() {
@@ -257,6 +280,11 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
   // ---------- Online / pedidos ----------
 
   void _alternarOnline() {
+    if (!_online && _saldo <= 0) {
+      _aviso('Você está sem tokens. Compre mais para ficar online.');
+      _abrirLoja();
+      return;
+    }
     setState(() => _online = !_online);
     if (_online) {
       _primeiraLista = true;
@@ -312,12 +340,20 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     setState(() => _aceitando = true);
     try {
       final ref = _db.collection('corridas').doc(id);
+      final eu = _db.collection('users').doc(_uid);
+      // Aceitar a corrida gasta 1 token.
       await _db.runTransaction((tx) async {
         final snap = await tx.get(ref);
+        final perfil = await tx.get(eu);
         if (snap.data()?['status'] != 'solicitada') {
           throw 'Essa corrida já foi aceita por outro motorista.';
         }
-        tx.update(ref, {'status': 'aceita', 'motoristaId': _uid});
+        if (saldoTokens(perfil.data()) <= 0) {
+          throw 'Você está sem tokens. Compre mais na loja.';
+        }
+        tx.update(ref,
+            {'status': 'aceita', 'motoristaId': _uid, 'tokenCobrado': true});
+        tx.update(eu, {'tokens': FieldValue.increment(-1)});
       });
       _acompanhar(id);
     } catch (e) {
@@ -617,6 +653,8 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
             const Text('PiraCar',
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const Spacer(),
+            SeloTokens(saldo: _saldo, onTap: _abrirLoja),
+            const SizedBox(width: 6),
             GestureDetector(
               onTap: _corridaId == null ? _alternarOnline : null,
               child: AnimatedContainer(
@@ -693,6 +731,16 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
             title: Text((d['placa'] ?? '-').toString()),
             subtitle: const Text('Placa'),
           ),
+          ListTile(
+            leading: const Icon(Icons.toll, color: Color(0xFFFFB300)),
+            title: Text('$_saldo ${_saldo == 1 ? 'token' : 'tokens'}'),
+            subtitle: const Text('Loja de tokens'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.pop(context);
+              _abrirLoja();
+            },
+          ),
           const Divider(),
           ListTile(
             leading: const Icon(Icons.logout),
@@ -751,15 +799,29 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
         const Text('Você está offline',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
-        const Text('Fique online para receber pedidos de corrida.'),
+        Text(_saldo <= 0
+            ? 'Você está sem tokens. Compre mais para receber corridas.'
+            : 'Fique online para receber pedidos de corrida. '
+                'Você tem $_saldo ${_saldo == 1 ? 'token' : 'tokens'}.'),
         const SizedBox(height: 12),
         SizedBox(
           width: double.infinity,
-          child: FilledButton(
-            onPressed: _alternarOnline,
-            child: const Text('Ficar online'),
-          ),
+          child: _saldo <= 0
+              ? FilledButton.icon(
+                  onPressed: _abrirLoja,
+                  icon: const Icon(Icons.toll),
+                  label: const Text('Comprar tokens'),
+                )
+              : FilledButton(
+                  onPressed: _alternarOnline,
+                  child: const Text('Ficar online'),
+                ),
         ),
+        if (_saldo > 0 && _saldo <= avisoTokens)
+          TextButton(
+            onPressed: _abrirLoja,
+            child: const Text('Saldo baixo, comprar tokens'),
+          ),
       ],
     );
   }
