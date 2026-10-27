@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'cadastro_veiculo.dart';
+import 'excluir_conta.dart';
 import 'foto.dart';
 import 'foto_trocar.dart';
 import 'painel_offline.dart';
@@ -122,6 +123,14 @@ class _EmAnalise extends StatelessWidget {
               OutlinedButton(
                 onPressed: () => FirebaseAuth.instance.signOut(),
                 child: const Text('Sair'),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: () => excluirConta(context, colecoesExtras: ['cnh']),
+                style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFFC62828)),
+                icon: const Icon(Icons.person_remove),
+                label: const Text('Excluir minha conta'),
               ),
             ],
           ),
@@ -1050,6 +1059,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
               FirebaseAuth.instance.signOut();
             },
           ),
+          const BotaoExcluirConta(colecoesExtras: ['cnh']),
         ],
       ),
     );
