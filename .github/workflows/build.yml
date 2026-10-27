@@ -35,7 +35,6 @@ jobs:
           if [ -n "$KEYSTORE" ]; then
             mkdir -p ~/.android
             echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
-            keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep -E "SHA1|SHA256"
           else
             echo "::warning::Secret DEBUG_KEYSTORE_BASE64 não configurado; o APK sai com um certificado temporário."
           fi
@@ -68,6 +67,10 @@ jobs:
         env:
           MAPS_KEY: ${{ secrets.MAPS_API_KEY }}
         run: flutter build apk --release --dart-define=MAPS_KEY="$MAPS_KEY"
+
+      - name: Mostrar SHA do certificado
+        run: |
+          keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep -E "SHA1|SHA256"
 
       - uses: actions/upload-artifact@v4
         with:
