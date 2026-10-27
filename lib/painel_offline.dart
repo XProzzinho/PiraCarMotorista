@@ -78,8 +78,6 @@ class PainelOffline extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 12),
-        ResumoDia(uid: uid, saldo: saldo, aviso: aviso, onLoja: onLoja),
         const SizedBox(height: 14),
         if (semTokens)
           SizedBox(
@@ -164,6 +162,43 @@ class ResumoDia extends StatelessWidget {
   }
 }
 
+/// Item do menu com os ganhos de hoje (corridas finalizadas hoje).
+class GanhosHojeTile extends StatelessWidget {
+  const GanhosHojeTile({super.key, required this.uid});
+
+  final String uid;
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+      stream: FirebaseFirestore.instance
+          .collection('corridas')
+          .where('motoristaId', isEqualTo: uid)
+          .snapshots(),
+      builder: (context, snap) {
+        final hoje = DateTime.now();
+        double ganhos = 0;
+        for (final d in snap.data?.docs ?? const []) {
+          final c = d.data();
+          final t = c['criadoEm'];
+          if (c['status'] != 'finalizada' || t is! Timestamp) continue;
+          final dt = t.toDate();
+          if (dt.year != hoje.year ||
+              dt.month != hoje.month ||
+              dt.day != hoje.day) continue;
+          final v = c['valor'];
+          if (v is num) ganhos += v;
+        }
+        return ListTile(
+          leading: const Icon(Icons.payments, color: Color(0xFF2E7D32)),
+          title: Text(_real(ganhos)),
+          subtitle: const Text('Ganhos de hoje'),
+        );
+      },
+    );
+  }
+}
+
 /// Painel "Você está online": procurando corridas + botão Ficar offline.
 class PainelOnline extends StatelessWidget {
   const PainelOnline({
@@ -215,8 +250,6 @@ class PainelOnline extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 12),
-        ResumoDia(uid: uid, saldo: saldo, aviso: aviso, onLoja: onLoja),
         const SizedBox(height: 14),
         SizedBox(
           height: 58,

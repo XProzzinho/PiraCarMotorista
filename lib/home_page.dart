@@ -1189,53 +1189,24 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   }
 
   Widget _barraTopo() {
+    // Só o botão redondo do menu, solto em cima do mapa.
     return SafeArea(
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(12, 8, 12, 0),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(30),
-          boxShadow: const [
-            BoxShadow(color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))
-          ],
-        ),
-        child: Row(
-          children: [
-            IconButton(
-              icon: const Icon(Icons.menu),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 8, 14, 0),
+          child: Material(
+            color: Colors.white,
+            shape: const CircleBorder(),
+            elevation: 4,
+            shadowColor: Colors.black38,
+            child: IconButton(
+              tooltip: 'Menu',
+              icon: const Icon(Icons.menu_rounded,
+                  size: 26, color: Color(0xFF0B2545)),
               onPressed: () => _scaffold.currentState?.openDrawer(),
             ),
-            const Text('PiraCar',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Spacer(),
-            SeloTokens(saldo: _saldo, onTap: _abrirLoja),
-            const SizedBox(width: 6),
-            GestureDetector(
-              onTap: _corridaId == null ? _alternarOnline : null,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: _online ? Colors.green : Colors.grey.shade500,
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(_online ? Icons.wifi_tethering : Icons.power_settings_new,
-                        color: Colors.white, size: 18),
-                    const SizedBox(width: 6),
-                    Text(_online ? 'Online' : 'Offline',
-                        style: const TextStyle(
-                            color: Colors.white, fontWeight: FontWeight.bold)),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 4),
-          ],
+          ),
         ),
       ),
     );
@@ -1307,6 +1278,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
             title: Text((d['placa'] ?? '-').toString()),
             subtitle: const Text('Placa'),
           ),
+          GanhosHojeTile(uid: _uid),
           ListTile(
             leading: const Icon(Icons.toll, color: Color(0xFFFFB300)),
             title: Text('$_saldo ${_saldo == 1 ? 'token' : 'tokens'}'),
