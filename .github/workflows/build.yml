@@ -70,7 +70,11 @@ jobs:
 
       - name: Mostrar SHA do certificado
         run: |
-          keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep -E "SHA1|SHA256"
+          if [ -f ~/.android/debug.keystore ]; then
+            keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep -E "SHA1:|SHA256:" | sed 's/^[[:space:]]*/::notice::/' || true
+          else
+            echo "::warning::Sem chave fixa. Configure o secret DEBUG_KEYSTORE_BASE64."
+          fi
 
       - uses: actions/upload-artifact@v4
         with:
