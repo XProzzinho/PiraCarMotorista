@@ -10,6 +10,30 @@ const _azul = Color(0xFF1565C0);
 const _campoFundo = Color(0xFFF4F6FA);
 const _campoBorda = Color(0xFFE2E8F0);
 
+String soDigitos(String s) => s.replaceAll(RegExp(r'\D'), '');
+
+bool cpfValido(String cpf) {
+  final d = soDigitos(cpf).split('').map(int.parse).toList();
+  if (d.length != 11 || d.toSet().length == 1) return false;
+  int digito(int n) {
+    var soma = 0;
+    for (var i = 0; i < n; i++) {
+      soma += d[i] * (n + 1 - i);
+    }
+    final r = (soma * 10) % 11;
+    return r == 10 ? 0 : r;
+  }
+
+  return digito(9) == d[9] && digito(10) == d[10];
+}
+
+/// Confere CPF e RG; devolve a mensagem de erro ou null se estiver ok.
+String? erroDocumentos(String cpf, String rg) {
+  if (!cpfValido(cpf)) return 'CPF inválido. Confira os números.';
+  if (rg.trim().length < 5) return 'Digite o número do seu RG.';
+  return null;
+}
+
 // Limite de tamanho da foto (o Firestore aceita até 1 MB por documento).
 const _limiteBytes = 700 * 1024;
 
@@ -170,6 +194,8 @@ class _CompletarCadastroPageState extends State<CompletarCadastroPage> {
   late final _modelo = TextEditingController(text: _txt('carro'));
   late final _cor = TextEditingController(text: _txt('cor'));
   late final _placa = TextEditingController(text: _txt('placa'));
+  late final _cpf = TextEditingController(text: _txt('cpf'));
+  late final _rg = TextEditingController(text: _txt('rg'));
   Uint8List? _cnh;
   bool _salvando = false;
 
@@ -182,6 +208,8 @@ class _CompletarCadastroPageState extends State<CompletarCadastroPage> {
     _modelo.dispose();
     _cor.dispose();
     _placa.dispose();
+    _cpf.dispose();
+    _rg.dispose();
     super.dispose();
   }
 
@@ -200,6 +228,11 @@ class _CompletarCadastroPageState extends State<CompletarCadastroPage> {
       _aviso('Preencha nome, modelo, cor e placa do carro.');
       return;
     }
+    final erroDoc = erroDocumentos(_cpf.text, _rg.text);
+    if (erroDoc != null) {
+      _aviso(erroDoc);
+      return;
+    }
     if (_cnh == null && !_jaTemCnh) {
       _aviso('Envie a foto da sua CNH.');
       return;
@@ -213,6 +246,8 @@ class _CompletarCadastroPageState extends State<CompletarCadastroPage> {
         'carro': _modelo.text.trim(),
         'cor': _cor.text.trim(),
         'placa': _placa.text.trim().toUpperCase(),
+        'cpf': soDigitos(_cpf.text),
+        'rg': _rg.text.trim().toUpperCase(),
         'temCnh': true,
       });
     } catch (e) {
@@ -241,8 +276,8 @@ class _CompletarCadastroPageState extends State<CompletarCadastroPage> {
           padding: const EdgeInsets.all(20),
           children: [
             const Text(
-              'Precisamos dos dados do seu carro e da foto da CNH para '
-              'liberar as corridas.',
+              'Precisamos dos seus documentos, dos dados do carro e da foto '
+              'da CNH para liberar as corridas.',
               style: TextStyle(fontSize: 15, color: Color(0xFF5B6577)),
             ),
             const SizedBox(height: 20),
@@ -274,6 +309,20 @@ class _CompletarCadastroPageState extends State<CompletarCadastroPage> {
               controller: _placa,
               textCapitalization: TextCapitalization.characters,
               decoration: decoracaoCampo('ABC1D23', Icons.pin_outlined),
+            ),
+            const SizedBox(height: 16),
+            rotuloCampo('CPF'),
+            TextField(
+              controller: _cpf,
+              keyboardType: TextInputType.number,
+              decoration: decoracaoCampo('000.000.000-00', Icons.badge_outlined),
+            ),
+            const SizedBox(height: 16),
+            rotuloCampo('RG'),
+            TextField(
+              controller: _rg,
+              textCapitalization: TextCapitalization.characters,
+              decoration: decoracaoCampo('Ex.: MG-12.345.678', Icons.credit_card),
             ),
             const SizedBox(height: 16),
             rotuloCampo(_jaTemCnh

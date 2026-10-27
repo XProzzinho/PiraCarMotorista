@@ -88,7 +88,9 @@ class HomePage extends StatelessWidget {
         final dados = snap.data!.data() ?? {};
         final incompleto = dados['temCnh'] != true ||
             (dados['cor'] ?? '').toString().trim().isEmpty ||
-            (dados['placa'] ?? '').toString().trim().isEmpty;
+            (dados['placa'] ?? '').toString().trim().isEmpty ||
+            (dados['cpf'] ?? '').toString().trim().isEmpty ||
+            (dados['rg'] ?? '').toString().trim().isEmpty;
         if (incompleto) return CompletarCadastroPage(dados: dados);
         if (dados['aprovado'] != true) return const _EmAnalise();
         return _MapaMotorista(dados: dados);
