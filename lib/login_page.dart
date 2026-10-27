@@ -203,7 +203,7 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     final topo = MediaQuery.paddingOf(context).top;
-    final alturaHero = 262 + topo;
+    final alturaHero = 300 + topo;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle.light,
@@ -223,7 +223,7 @@ class _LoginPageState extends State<LoginPage> {
                       Positioned(
                         left: 28,
                         right: 28,
-                        top: topo + 64,
+                        top: topo + 130,
                         child: const _Marca(),
                       ),
                     ],
@@ -549,7 +549,7 @@ class _MapaPainter extends CustomPainter {
     final s = size.width / 390;
     canvas.save();
     canvas.clipRect(Offset.zero & size);
-    canvas.translate(0, size.height - 300 * s);
+    canvas.translate(0, -50 * s);
     canvas.scale(s);
 
     final ruaLarga = Paint()
@@ -566,11 +566,11 @@ class _MapaPainter extends CustomPainter {
 
     rua(ruaLarga, -20, 60, 410, 40);
     rua(ruaLarga, -20, 150, 410, 175);
-    rua(ruaLarga, 70, -400, 95, 320);
-    rua(ruaLarga, 250, -400, 230, 320);
-    rua(ruaLarga, 330, -400, 360, 320);
+    rua(ruaLarga, 70, -400, 95, 460);
+    rua(ruaLarga, 250, -400, 230, 460);
+    rua(ruaLarga, 330, -400, 360, 460);
     rua(ruaFina, -20, 105, 410, 110);
-    rua(ruaFina, 160, -400, 170, 320);
+    rua(ruaFina, 160, -400, 170, 460);
     rua(ruaFina, 20, 230, 410, 215);
 
     final rio = Path()
