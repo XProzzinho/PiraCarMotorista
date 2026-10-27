@@ -29,6 +29,7 @@ jobs:
       - name: Certificado fixo de assinatura
         env:
           KEYSTORE: ${{ secrets.DEBUG_KEYSTORE_BASE64 }}
+          KEYSTORE2: ${{ secrets.DEBUG_KEYSTORE_PARTE2 }}
         run: |
           # Assina sempre com o mesmo certificado, para o SHA-1 cadastrado
           # no Firebase (login com Google) valer em todos os builds.
@@ -37,7 +38,8 @@ jobs:
             exit 0
           fi
           mkdir -p ~/.android
-          LIMPO=$(printf '%s' "$KEYSTORE" | tr -d ' \n\r\t')
+          # a chave pode vir em duas partes (o celular corta textos longos)
+          LIMPO=$(printf '%s%s' "$KEYSTORE" "$KEYSTORE2" | tr -d ' \n\r\t')
           echo "Tamanho do segredo: ${#LIMPO} caracteres (o certo é 3556)"
           if ! printf '%s' "$LIMPO" | base64 -d > ~/.android/debug.keystore 2>/dev/null \
              || ! keytool -list -keystore ~/.android/debug.keystore -storepass android >/dev/null 2>&1; then
