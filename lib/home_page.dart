@@ -11,6 +11,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'cadastro_veiculo.dart';
 import 'excluir_conta.dart';
+import 'aviso.dart';
 import 'foto.dart';
 import 'foto_trocar.dart';
 import 'painel_offline.dart';
@@ -948,6 +949,17 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
           ),
           ),
           Positioned(top: 0, left: 0, right: 0, child: _barraTopo()),
+          const Positioned(
+            top: 0,
+            left: 12,
+            right: 12,
+            child: SafeArea(
+              child: Padding(
+                padding: EdgeInsets.only(top: 72),
+                child: AvisoBanner(tipo: 'motorista'),
+              ),
+            ),
+          ),
           Positioned(
             right: 12,
             bottom: oferta != null ? 420 : 300,
