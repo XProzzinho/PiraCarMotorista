@@ -12,6 +12,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'cadastro_veiculo.dart';
 import 'excluir_conta.dart';
 import 'aviso.dart';
+import 'carro_icone.dart';
 import 'foto.dart';
 import 'foto_trocar.dart';
 import 'painel_offline.dart';
@@ -66,59 +67,6 @@ Future<void> _tocarSom() async {
     await const MethodChannel('flutter_ringtone_player')
         .invokeMethod('play', {'android': 2, 'ios': 1007, 'asAlarm': false});
   } catch (_) {}
-}
-
-// Carrinho visto de cima, com a frente para cima. No mapa ele fica "deitado"
-// (flat) e gira com a direção do carro, como no Google Maps.
-Future<BitmapDescriptor> _criarCarro() async {
-  const tam = 120.0;
-  final gravador = ui.PictureRecorder();
-  final c = Canvas(gravador);
-  RRect caixa(double x, double y, double w, double h, double r) =>
-      RRect.fromRectAndRadius(Rect.fromLTWH(x, y, w, h), Radius.circular(r));
-
-  c.drawRRect(
-      caixa(32, 14, 58, 100, 18),
-      Paint()
-        ..color = Colors.black38
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
-  final corpo = caixa(33, 11, 54, 98, 16);
-  c.drawRRect(corpo, Paint()..color = Colors.white);
-  c.drawRRect(
-      corpo,
-      Paint()
-        ..color = _verde
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3);
-  final vidro = Paint()..color = const Color(0xFF263238);
-  c.drawPath(
-      Path()
-        ..moveTo(39, 30)
-        ..lineTo(81, 30)
-        ..lineTo(76, 46)
-        ..lineTo(44, 46)
-        ..close(),
-      vidro);
-  c.drawRRect(caixa(44, 48, 32, 24, 4), Paint()..color = const Color(0xFFE3E8EE));
-  c.drawPath(
-      Path()
-        ..moveTo(44, 74)
-        ..lineTo(76, 74)
-        ..lineTo(79, 88)
-        ..lineTo(41, 88)
-        ..close(),
-      vidro);
-  final farol = Paint()..color = const Color(0xFFFFD54F);
-  c.drawCircle(const Offset(42, 17), 4, farol);
-  c.drawCircle(const Offset(78, 17), 4, farol);
-  final lanterna = Paint()..color = const Color(0xFFE53935);
-  c.drawRRect(caixa(38, 102, 10, 4, 2), lanterna);
-  c.drawRRect(caixa(72, 102, 10, 4, 2), lanterna);
-
-  final img = await gravador.endRecording().toImage(tam.toInt(), tam.toInt());
-  final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
-  // ignore: deprecated_member_use
-  return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
 }
 
 IconData _iconeManobra(String manobra) => switch (manobra) {
@@ -367,7 +315,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
 
   Future<void> _carregarIcones() async {
     try {
-      final carro = await _criarCarro();
+      final carro = await criarCarroDeCima();
       final pessoa = await _criarIcone(Icons.person, Colors.blue.shade700);
       if (!mounted) return;
       setState(() {
@@ -455,6 +403,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     try {
       await _db.collection('corridas').doc(_corridaId).update({
         'motoristaPos': GeoPoint(ll.latitude, ll.longitude),
+        'motoristaDir': _direcao,
         'motoristaPosEm': FieldValue.serverTimestamp(),
       });
     } catch (_) {}
