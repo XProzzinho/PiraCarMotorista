@@ -265,6 +265,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
 
   @override
   void dispose() {
+    _reavaliador?.cancel();
     _batida?.cancel();
     if (_online) _sairDoMapa();
     _subPos?.cancel();
@@ -357,12 +358,17 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     if (_online) {
       _primeiraLista = true;
       _vistos.clear();
+      _reavaliador?.cancel();
+      _reavaliador =
+          Timer.periodic(const Duration(seconds: 5), (_) => _reavaliar());
       _subPedidos = _db
           .collection('corridas')
           .where('status', isEqualTo: 'solicitada')
           .snapshots()
           .listen(_novosPedidos, onError: (_) {});
     } else {
+      _reavaliador?.cancel();
+      _reavaliador = null;
       _subPedidos?.cancel();
       _subPedidos = null;
       _pedidos = [];
@@ -371,13 +377,42 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     }
   }
 
-  void _novosPedidos(QuerySnapshot<Map<String, dynamic>> snap) {
+  // Regra do motorista mais perto: o app do passageiro oferece o pedido
+  // a um motorista por vez (campo ofertadoPara). Só aparece para mim o
+  // pedido oferecido a mim. Se o despacho parar por mais de 60 s (app do
+  // passageiro fechado, por exemplo), o pedido fica aberto para todos.
+  static const _tempoOferta = 15;
+  Timer? _reavaliador;
+
+  bool _paraMim(Map<String, dynamic> m) {
+    if (m['ofertadoPara'] == _uid) return true;
+    final ref = m['ofertadoEm'] ?? m['criadoEm'];
+    if (ref is Timestamp) {
+      return DateTime.now().difference(ref.toDate()).inSeconds > 60;
+    }
+    return false;
+  }
+
+  void _avisarNovos() {
     var novo = false;
-    for (final d in snap.docs) {
-      if (_vistos.add(d.id) && !_primeiraLista) novo = true;
+    for (final d in _pedidos) {
+      if (_paraMim(d.data()) && _vistos.add(d.id) && !_primeiraLista) {
+        novo = true;
+      }
     }
     _primeiraLista = false;
     if (novo && _online && _corridaId == null) _alertar();
+  }
+
+  void _reavaliar() {
+    if (!mounted || !_online) return;
+    _avisarNovos();
+    setState(() {});
+    if (_ofertaId != null && _oferta == null) _mostrarOferta(null);
+    _escolherOferta();
+  }
+
+  void _novosPedidos(QuerySnapshot<Map<String, dynamic>> snap) {
     // mais antigo primeiro
     final docs = snap.docs.toList()
       ..sort((a, b) {
@@ -388,24 +423,29 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
       });
     if (!mounted) return;
     setState(() => _pedidos = docs);
+    _avisarNovos();
+    if (_ofertaId != null && _oferta == null) _mostrarOferta(null);
     _escolherOferta();
   }
 
+  Iterable<QueryDocumentSnapshot<Map<String, dynamic>>> get _visiveis =>
+      _pedidos.where((d) => _paraMim(d.data()));
+
   Map<String, dynamic>? get _oferta {
-    for (final d in _pedidos) {
+    for (final d in _visiveis) {
       if (d.id == _ofertaId) return d.data();
     }
     return null;
   }
 
   int get _outrosPedidos =>
-      _pedidos.where((d) => !_recusados.contains(d.id)).length -
+      _visiveis.where((d) => !_recusados.contains(d.id)).length -
       (_oferta != null ? 1 : 0);
 
   void _escolherOferta() {
     if (!_online || _corridaId != null) return;
     if (_oferta != null) return; // continua mostrando a atual
-    for (final d in _pedidos) {
+    for (final d in _visiveis) {
       if (!_recusados.contains(d.id)) {
         _mostrarOferta(d.id);
         return;
@@ -414,8 +454,18 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     if (_ofertaId != null) _mostrarOferta(null);
   }
 
-  void _recusarOferta() {
-    if (_ofertaId != null) _recusados.add(_ofertaId!);
+  void _recusarOferta({bool avisar = true}) {
+    final id = _ofertaId;
+    if (id != null) {
+      _recusados.add(id);
+      // devolve o pedido para ir ao próximo motorista mais perto
+      if (avisar && _oferta?['ofertadoPara'] == _uid) {
+        _db.collection('corridas').doc(id).update({
+          'ofertadoPara': null,
+          'recusadoPor': FieldValue.arrayUnion([_uid]),
+        }).catchError((_) {});
+      }
+    }
     _mostrarOferta(null);
     _escolherOferta();
   }
@@ -1141,10 +1191,44 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     final longa = vg != null && vg.segundos > 45 * 60;
     const cinza = TextStyle(fontSize: 14, color: Colors.black54);
     const forte = TextStyle(fontSize: 15, fontWeight: FontWeight.w700);
+    final exclusiva = d['ofertadoPara'] == _uid;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (exclusiva)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: TweenAnimationBuilder<double>(
+              key: ValueKey('tempo_$id'),
+              tween: Tween(begin: 1, end: 0),
+              duration: const Duration(seconds: _tempoOferta),
+              onEnd: () {
+                if (mounted && _ofertaId == id && _corridaId == null) {
+                  _recusarOferta(avisar: false);
+                }
+              },
+              builder: (context, v, _) => Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: v,
+                      minHeight: 6,
+                      backgroundColor: Colors.grey.shade200,
+                      color: v > 0.33 ? const Color(0xFF276EF1) : Colors.red,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Você é o motorista mais perto • ${(v * _tempoOferta).ceil()} s para aceitar',
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                ],
+              ),
+            ),
+          ),
         Row(
           children: [
             Container(
