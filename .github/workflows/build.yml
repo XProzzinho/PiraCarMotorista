@@ -32,12 +32,19 @@ jobs:
         run: |
           # Assina sempre com o mesmo certificado, para o SHA-1 cadastrado
           # no Firebase (login com Google) valer em todos os builds.
-          if [ -n "$KEYSTORE" ]; then
-            mkdir -p ~/.android
-            echo "$KEYSTORE" | base64 -d > ~/.android/debug.keystore
-          else
+          if [ -z "$KEYSTORE" ]; then
             echo "::warning::Secret DEBUG_KEYSTORE_BASE64 não configurado; o APK sai com um certificado temporário."
+            exit 0
           fi
+          mkdir -p ~/.android
+          LIMPO=$(printf '%s' "$KEYSTORE" | tr -d ' \n\r\t')
+          echo "Tamanho do segredo: ${#LIMPO} caracteres (o certo é 3556)"
+          if ! printf '%s' "$LIMPO" | base64 -d > ~/.android/debug.keystore 2>/dev/null \
+             || ! keytool -list -keystore ~/.android/debug.keystore -storepass android >/dev/null 2>&1; then
+            echo "::error::O secret DEBUG_KEYSTORE_BASE64 está incompleto ou com erro: tem ${#LIMPO} caracteres, o certo é 3556. Apague e cole de novo o texto inteiro do arquivo."
+            exit 1
+          fi
+          keytool -list -v -keystore ~/.android/debug.keystore -storepass android | grep -E "SHA1:|SHA256:" | sed 's/^[[:space:]]*/::notice::Chave fixa OK - /' || true
 
       - name: Gerar projeto Android
         run: |
