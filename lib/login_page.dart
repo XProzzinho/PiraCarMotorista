@@ -27,6 +27,8 @@ class _LoginPageState extends State<LoginPage> {
   final _nome = TextEditingController();
   final _carro = TextEditingController();
   final _cor = TextEditingController();
+  final _cpf = TextEditingController();
+  final _rg = TextEditingController();
   final _placa = TextEditingController();
   final _email = TextEditingController();
   final _senha = TextEditingController();
@@ -40,6 +42,8 @@ class _LoginPageState extends State<LoginPage> {
     _nome.dispose();
     _carro.dispose();
     _cor.dispose();
+    _cpf.dispose();
+    _rg.dispose();
     _placa.dispose();
     _email.dispose();
     _senha.dispose();
@@ -58,6 +62,8 @@ class _LoginPageState extends State<LoginPage> {
       'carro': _carro.text.trim(),
       'cor': _cor.text.trim(),
       'placa': _placa.text.trim().toUpperCase(),
+      'cpf': soDigitos(_cpf.text),
+      'rg': _rg.text.trim().toUpperCase(),
       'temCnh': temCnh,
       'role': 'motorista',
       'aprovado': false,
@@ -88,6 +94,11 @@ class _LoginPageState extends State<LoginPage> {
           .any((c) => c.text.trim().isEmpty);
       if (vazio) {
         _aviso('Preencha nome, modelo, cor e placa do carro.');
+        return;
+      }
+      final erroDoc = erroDocumentos(_cpf.text, _rg.text);
+      if (erroDoc != null) {
+        _aviso(erroDoc);
         return;
       }
       if (_cnh == null) {
@@ -295,6 +306,20 @@ class _LoginPageState extends State<LoginPage> {
             controller: _placa,
             textCapitalization: TextCapitalization.characters,
             decoration: _decoracao('ABC1D23', Icons.pin_outlined),
+          ),
+          const SizedBox(height: 16),
+          _rotulo('CPF'),
+          TextField(
+            controller: _cpf,
+            keyboardType: TextInputType.number,
+            decoration: _decoracao('000.000.000-00', Icons.badge_outlined),
+          ),
+          const SizedBox(height: 16),
+          _rotulo('RG'),
+          TextField(
+            controller: _rg,
+            textCapitalization: TextCapitalization.characters,
+            decoration: _decoracao('Ex.: MG-12.345.678', Icons.credit_card),
           ),
           const SizedBox(height: 16),
           _rotulo('Foto da CNH'),
