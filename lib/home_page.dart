@@ -170,7 +170,8 @@ class _MapaMotorista extends StatefulWidget {
   State<_MapaMotorista> createState() => _MapaMotoristaState();
 }
 
-class _MapaMotoristaState extends State<_MapaMotorista> {
+class _MapaMotoristaState extends State<_MapaMotorista>
+    with WidgetsBindingObserver {
   static const _centroPirapora = LatLng(-17.3453, -44.9419);
 
   final _scaffold = GlobalKey<ScaffoldState>();
@@ -226,6 +227,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _carregarIcones();
     _iniciarLocalizacao();
     _retomarCorrida();
@@ -288,16 +290,28 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     _batida = null;
     if (ligar) {
       _publicarPresenca(forcar: true);
-      // a cada 45 s confirma que continua online, mesmo parado
-      _batida = Timer.periodic(const Duration(seconds: 45),
+      // a cada 25 s confirma que continua online, mesmo parado
+      _batida = Timer.periodic(const Duration(seconds: 25),
           (_) => _publicarPresenca(forcar: true));
     } else {
       _sairDoMapa();
     }
   }
 
+  // Fechou o app ou saiu dele: fica offline (menos no meio de uma corrida).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if ((state == AppLifecycleState.paused ||
+            state == AppLifecycleState.detached) &&
+        _online &&
+        _corridaId == null) {
+      _alternarOnline();
+    }
+  }
+
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _reavaliador?.cancel();
     _batida?.cancel();
     if (_online) _sairDoMapa();
