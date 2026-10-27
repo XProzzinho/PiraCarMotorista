@@ -15,6 +15,7 @@ import 'aviso.dart';
 import 'carro_icone.dart';
 import 'foto.dart';
 import 'foto_trocar.dart';
+import 'menu_visual.dart';
 import 'painel_offline.dart';
 import 'rota.dart';
 import 'tokens.dart';
@@ -1230,79 +1231,41 @@ class _MapaMotoristaState extends State<_MapaMotorista>
 
   Widget _menu() {
     final d = widget.dados;
-    return Drawer(
-      child: ListView(
-        padding: EdgeInsets.zero,
-        children: [
-          UserAccountsDrawerHeader(
-            decoration: const BoxDecoration(color: _azul),
-            currentAccountPicture: GestureDetector(
-              onTap: () => trocarFotoPerfil(context),
-              child: Stack(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: const BoxDecoration(
-                        color: Colors.white, shape: BoxShape.circle),
-                    child: FotoPerfil(dados: d, raio: 34),
-                  ),
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                          color: Colors.white, shape: BoxShape.circle),
-                      child: const Icon(Icons.photo_camera,
-                          size: 14, color: _azul),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            accountName: Text((d['nome'] ?? 'Motorista').toString()),
-            accountEmail: Text((d['email'] ??
-                    FirebaseAuth.instance.currentUser?.email ??
-                    '')
-                .toString()),
-          ),
-          ListTile(
-            leading: const Icon(Icons.directions_car),
-            title: Text([d['carro'], d['cor']]
-                .where((v) => (v ?? '').toString().trim().isNotEmpty)
-                .join(' • ')),
-            subtitle: const Text('Carro'),
-          ),
-          ListTile(
-            leading: const Icon(Icons.badge),
-            title: Text((d['placa'] ?? '-').toString()),
-            subtitle: const Text('Placa'),
-          ),
-          GanhosHojeTile(uid: _uid),
-          ListTile(
-            leading: const Icon(Icons.toll, color: Color(0xFFFFB300)),
-            title: Text('$_saldo ${_saldo == 1 ? 'token' : 'tokens'}'),
-            subtitle: const Text('Loja de tokens'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.pop(context);
-              _abrirLoja();
-            },
-          ),
-          const Divider(),
-          ListTile(
-            leading: const Icon(Icons.logout),
-            title: const Text('Sair'),
-            onTap: () async {
-              Navigator.pop(context);
-              _batida?.cancel();
-              await _sairDoMapa();
-              FirebaseAuth.instance.signOut();
-            },
-          ),
-          const BotaoExcluirConta(colecoesExtras: ['cnh']),
-        ],
+    final nome = (d['nome'] ?? 'Motorista').toString();
+    final placa = (d['placa'] ?? '').toString();
+    return GavetaPiraCar(
+      cabecalho: CabecalhoMenu(
+        nome: nome,
+        subtitulo: [
+          if (placa.isNotEmpty) placa,
+          '$_saldo ${_saldo == 1 ? 'token' : 'tokens'}',
+        ].join(' · '),
+        foto: FotoPerfil(dados: d, raio: 38),
+        onFoto: () => trocarFotoPerfil(context),
       ),
+      itens: [
+        GanhosHojeTile(uid: _uid),
+        const SizedBox(height: 10),
+        ItemMenu(Icons.toll_outlined, 'Loja de tokens', () {
+          Navigator.pop(context);
+          _abrirLoja();
+        }, destaque: true),
+        ItemMenu(Icons.settings_outlined, 'Configurações', () {
+          Navigator.pop(context);
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => _ConfiguracoesMotorista(uid: _uid),
+            ),
+          );
+        }),
+        ItemMenu(Icons.logout, 'Sair', () async {
+          Navigator.pop(context);
+          _batida?.cancel();
+          await _sairDoMapa();
+          FirebaseAuth.instance.signOut();
+        }),
+      ],
     );
   }
 
@@ -1760,6 +1723,89 @@ class _CartaoPassageiro extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+}
+
+/// Configurações do motorista: foto, dados do carro, tokens,
+/// Editar dados e Excluir minha conta.
+class _ConfiguracoesMotorista extends StatelessWidget {
+  const _ConfiguracoesMotorista({required this.uid});
+
+  final String uid;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF4F6FA),
+      appBar: barraTela('Configurações'),
+      body: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+        stream: FirebaseFirestore.instance
+            .collection('users')
+            .doc(uid)
+            .snapshots(),
+        builder: (context, snap) {
+          final d = snap.data?.data() ?? const <String, dynamic>{};
+          final saldo = saldoTokens(d);
+          return ListView(
+            padding: const EdgeInsets.fromLTRB(18, 24, 18, 32),
+            children: [
+              FotoEditavel(
+                foto: FotoPerfil(dados: d, raio: 50),
+                onEditar: () => trocarFotoPerfil(context),
+              ),
+              const SizedBox(height: 10),
+              CartaoDados(linhas: [
+                LinhaDado('Nome completo', (d['nome'] ?? '').toString()),
+                LinhaDado('Placa', (d['placa'] ?? '').toString()),
+                LinhaDado('Carro', (d['carro'] ?? '').toString()),
+                LinhaDado('Cor', (d['cor'] ?? '').toString(), ultima: true),
+              ]),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF4D6),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: Row(
+                  children: [
+                    const Expanded(
+                      child: Text('Tokens',
+                          style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: corMenuTitulo)),
+                    ),
+                    Text('$saldo',
+                        style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w800,
+                            color: corMenuTitulo)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+              BotoesConta(
+                onEditar: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) =>
+                        CompletarCadastroPage(dados: d, editando: true),
+                  ),
+                ),
+                onExcluir: () async {
+                  await excluirConta(context, colecoesExtras: ['cnh']);
+                  if (FirebaseAuth.instance.currentUser == null &&
+                      context.mounted) {
+                    Navigator.of(context).popUntil((r) => r.isFirst);
+                  }
+                },
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

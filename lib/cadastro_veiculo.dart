@@ -181,9 +181,13 @@ Widget rotuloCampo(String texto) => Padding(
 /// Tela para o motorista completar os dados do carro e enviar a CNH
 /// (aparece para quem se cadastrou antes ou entrou com o Google).
 class CompletarCadastroPage extends StatefulWidget {
-  const CompletarCadastroPage({super.key, required this.dados});
+  const CompletarCadastroPage(
+      {super.key, required this.dados, this.editando = false});
 
   final Map<String, dynamic> dados;
+
+  /// Aberta pelas Configurações: volta depois de salvar.
+  final bool editando;
 
   @override
   State<CompletarCadastroPage> createState() => _CompletarCadastroPageState();
@@ -250,6 +254,7 @@ class _CompletarCadastroPageState extends State<CompletarCadastroPage> {
         'rg': _rg.text.trim().toUpperCase(),
         'temCnh': true,
       });
+      if (widget.editando && mounted) Navigator.pop(context);
     } catch (e) {
       _aviso('Não foi possível salvar: $e');
     } finally {
@@ -261,9 +266,9 @@ class _CompletarCadastroPageState extends State<CompletarCadastroPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Complete seu cadastro'),
+        title: Text(widget.editando ? 'Editar dados' : 'Complete seu cadastro'),
         centerTitle: true,
-        actions: [
+        actions: widget.editando ? null : [
           IconButton(
             tooltip: 'Sair',
             icon: const Icon(Icons.logout),

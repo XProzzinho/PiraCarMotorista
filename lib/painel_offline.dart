@@ -162,7 +162,7 @@ class ResumoDia extends StatelessWidget {
   }
 }
 
-/// Item do menu com os ganhos de hoje (corridas finalizadas hoje).
+/// Cartão do menu com os ganhos de hoje (corridas finalizadas hoje).
 class GanhosHojeTile extends StatelessWidget {
   const GanhosHojeTile({super.key, required this.uid});
 
@@ -189,10 +189,26 @@ class GanhosHojeTile extends StatelessWidget {
           final v = c['valor'];
           if (v is num) ganhos += v;
         }
-        return ListTile(
-          leading: const Icon(Icons.payments, color: Color(0xFF2E7D32)),
-          title: Text(_real(ganhos)),
-          subtitle: const Text('Ganhos de hoje'),
+        return Container(
+          height: 64,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: _azulNoite,
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text('Ganhos de hoje',
+                    style: TextStyle(color: Color(0xFFC9D6EA), fontSize: 14)),
+              ),
+              Text(_real(ganhos),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800)),
+            ],
+          ),
         );
       },
     );
