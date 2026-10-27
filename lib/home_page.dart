@@ -67,6 +67,77 @@ Future<void> _tocarSom() async {
   } catch (_) {}
 }
 
+// Carrinho visto de cima, com a frente para cima. No mapa ele fica "deitado"
+// (flat) e gira com a direção do carro, como no Google Maps.
+Future<BitmapDescriptor> _criarCarro() async {
+  const tam = 120.0;
+  final gravador = ui.PictureRecorder();
+  final c = Canvas(gravador);
+  RRect caixa(double x, double y, double w, double h, double r) =>
+      RRect.fromRectAndRadius(Rect.fromLTWH(x, y, w, h), Radius.circular(r));
+
+  c.drawRRect(
+      caixa(32, 14, 58, 100, 18),
+      Paint()
+        ..color = Colors.black38
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5));
+  final corpo = caixa(33, 11, 54, 98, 16);
+  c.drawRRect(corpo, Paint()..color = Colors.white);
+  c.drawRRect(
+      corpo,
+      Paint()
+        ..color = _verde
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3);
+  final vidro = Paint()..color = const Color(0xFF263238);
+  c.drawPath(
+      Path()
+        ..moveTo(39, 30)
+        ..lineTo(81, 30)
+        ..lineTo(76, 46)
+        ..lineTo(44, 46)
+        ..close(),
+      vidro);
+  c.drawRRect(caixa(44, 48, 32, 24, 4), Paint()..color = const Color(0xFFE3E8EE));
+  c.drawPath(
+      Path()
+        ..moveTo(44, 74)
+        ..lineTo(76, 74)
+        ..lineTo(79, 88)
+        ..lineTo(41, 88)
+        ..close(),
+      vidro);
+  final farol = Paint()..color = const Color(0xFFFFD54F);
+  c.drawCircle(const Offset(42, 17), 4, farol);
+  c.drawCircle(const Offset(78, 17), 4, farol);
+  final lanterna = Paint()..color = const Color(0xFFE53935);
+  c.drawRRect(caixa(38, 102, 10, 4, 2), lanterna);
+  c.drawRRect(caixa(72, 102, 10, 4, 2), lanterna);
+
+  final img = await gravador.endRecording().toImage(tam.toInt(), tam.toInt());
+  final bytes = await img.toByteData(format: ui.ImageByteFormat.png);
+  // ignore: deprecated_member_use
+  return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
+}
+
+IconData _iconeManobra(String manobra) => switch (manobra) {
+      'esquerda' => Icons.turn_left,
+      'direita' => Icons.turn_right,
+      'leve_esquerda' => Icons.turn_slight_left,
+      'leve_direita' => Icons.turn_slight_right,
+      'acentuada_esquerda' => Icons.turn_sharp_left,
+      'acentuada_direita' => Icons.turn_sharp_right,
+      'retorno' => Icons.u_turn_left,
+      'rotatoria' => Icons.roundabout_right,
+      'chegada' => Icons.flag,
+      _ => Icons.straight,
+    };
+
+String _distancia(double m) {
+  if (m < 1000) return '${((m / 10).round() * 10).clamp(0, 990)} m';
+  return '${(m / 1000).toStringAsFixed(1).replaceAll('.', ',')} km';
+}
+
 class HomePage extends StatelessWidget {
   const HomePage({super.key});
 
@@ -163,6 +234,8 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
   // Mapa 3D: câmera inclinada que segue o carro e gira com a direção.
   bool _seguir = true;
   double _direcao = 0;
+  LatLng? _pontoDirecao; // último ponto usado para calcular a direção
+  int _passo = 1; // próxima manobra da rota (modo navegação)
   double _zoom3d = 17.5;
   bool _online = false;
 
@@ -293,7 +366,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
 
   Future<void> _carregarIcones() async {
     try {
-      final carro = await _criarIcone(Icons.directions_car, _verde);
+      final carro = await _criarCarro();
       final pessoa = await _criarIcone(Icons.person, Colors.blue.shade700);
       if (!mounted) return;
       setState(() {
@@ -322,7 +395,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     _subPos = Geolocator.getPositionStream(
       locationSettings: const LocationSettings(
         accuracy: LocationAccuracy.high,
-        distanceFilter: 10,
+        distanceFilter: 4,
       ),
     ).listen((p) => _novaPosicao(p));
   }
@@ -331,13 +404,43 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     if (!mounted) return;
     final ll = LatLng(p.latitude, p.longitude);
     // só usa a direção quando o carro está andando (parado ela oscila)
-    if (p.speed > 1.5 && p.heading >= 0) _direcao = p.heading;
-    setState(() => _eu = ll);
-    if (centralizar) _seguir = true;
+    if (p.speed > 1.5 && p.heading >= 0) {
+      _direcao = p.heading;
+      _pontoDirecao = ll;
+    } else if (_pontoDirecao == null) {
+      _pontoDirecao = ll;
+    } else if (Geolocator.distanceBetween(_pontoDirecao!.latitude,
+            _pontoDirecao!.longitude, ll.latitude, ll.longitude) >=
+        8) {
+      // sem bússola do GPS: calcula pela direção em que o carro andou
+      final b = Geolocator.bearingBetween(_pontoDirecao!.latitude,
+          _pontoDirecao!.longitude, ll.latitude, ll.longitude);
+      _direcao = (b + 360) % 360;
+      _pontoDirecao = ll;
+    }
+    setState(() {
+      _eu = ll;
+      if (centralizar) _seguir = true;
+      _avancarPasso(ll);
+    });
     if (_seguir) _camera3d();
     _enviarPosicao(ll);
     _publicarPresenca();
     _atualizarRota();
+  }
+
+  // Passa para a próxima manobra quando o carro chega perto da atual.
+  void _avancarPasso(LatLng eu) {
+    final passos = _rota?.passos ?? const <Passo>[];
+    while (_passo < passos.length - 1) {
+      final p = passos[_passo].ponto;
+      if (Geolocator.distanceBetween(
+              eu.latitude, eu.longitude, p.latitude, p.longitude) >
+          25) {
+        break;
+      }
+      _passo++;
+    }
   }
 
   // Manda a posição para o passageiro acompanhar (no máximo a cada 4 s).
@@ -783,7 +886,11 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     final rota = exata ?? rotaEstimada(origem, alvo);
     final primeira = _rota == null;
     _rotaOrigem = origem;
-    setState(() => _rota = rota);
+    setState(() {
+      _rota = rota;
+      _passo = 1;
+      _avancarPasso(origem);
+    });
     if (primeira) {
       _ajustarCamera([origem, alvo, ...rota.pontos]);
       // mostra a rota inteira por 4 s e volta a seguir o carro em 3D
@@ -804,13 +911,13 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
   }
 
   void _voltar3d() {
-    _seguir = true;
+    setState(() => _seguir = true);
     _camera3d();
   }
 
   void _ajustarCamera(List<LatLng> pts) {
     if (pts.length < 2) return;
-    _seguir = false; // visão geral da rota (de cima)
+    setState(() => _seguir = false); // visão geral da rota (de cima)
     double minLat = pts.first.latitude, maxLat = minLat;
     double minLng = pts.first.longitude, maxLng = minLng;
     for (final p in pts) {
@@ -850,6 +957,7 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
     final oferta = _corridaId == null ? _oferta : null;
     final ofOrigem = _ll(oferta?['origem']);
     final ofDestino = _ll(oferta?['destino']);
+    final navegando = _navegando;
 
     return Scaffold(
       key: _scaffold,
@@ -857,7 +965,9 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
       body: Stack(
         children: [
           Listener(
-            onPointerDown: (_) => _seguir = false,
+            onPointerDown: (_) {
+              if (_seguir) setState(() => _seguir = false);
+            },
             child: GoogleMap(
             initialCameraPosition: const CameraPosition(
                 target: _centroPirapora, zoom: 16, tilt: 60),
@@ -872,7 +982,9 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
             zoomControlsEnabled: false,
             mapToolbarEnabled: false,
             padding:
-                EdgeInsets.only(top: 90, bottom: oferta != null ? 400 : 280),
+                EdgeInsets.only(
+                    top: navegando ? 300 : 90,
+                    bottom: oferta != null ? 400 : 280),
             polylines: {
               if (oferta != null && _ofertaAteMim != null)
                 Polyline(
@@ -904,6 +1016,8 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
                   position: _eu!,
                   icon: _iconeCarro,
                   anchor: const Offset(0.5, 0.5),
+                  flat: true,
+                  rotation: _direcao,
                   zIndex: 3,
                   infoWindow: const InfoWindow(title: 'Você'),
                 ),
@@ -947,7 +1061,47 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
             },
           ),
           ),
-          Positioned(top: 0, left: 0, right: 0, child: _barraTopo()),
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Column(
+              children: [
+                _barraTopo(),
+                if (navegando) _bannerNavegacao(),
+              ],
+            ),
+          ),
+          if (!_seguir && _eu != null)
+            Positioned(
+              left: 12,
+              bottom: oferta != null ? 420 : 300,
+              child: Material(
+                color: Colors.white,
+                elevation: 4,
+                shape: const StadiumBorder(),
+                child: InkWell(
+                  customBorder: const StadiumBorder(),
+                  onTap: _voltar3d,
+                  child: const Padding(
+                    padding:
+                        EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.navigation_outlined, color: _verde),
+                        SizedBox(width: 8),
+                        Text('Recentralizar',
+                            style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: _verde)),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           Positioned(
             right: 12,
             bottom: oferta != null ? 420 : 300,
@@ -966,6 +1120,99 @@ class _MapaMotoristaState extends State<_MapaMotorista> {
             ),
           ),
           Align(alignment: Alignment.bottomCenter, child: _painelInferior()),
+        ],
+      ),
+    );
+  }
+
+  bool get _navegando {
+    final s = _corrida?['status'];
+    return _corridaId != null &&
+        (s == 'aceita' || s == 'em_andamento') &&
+        (_rota?.passos.length ?? 0) > 1;
+  }
+
+  // Faixa verde do topo: próxima manobra e a distância até ela.
+  Widget _bannerNavegacao() {
+    final passos = _rota!.passos;
+    final i = _passo.clamp(0, passos.length - 1);
+    final atual = passos[i];
+    final depois = i + 1 < passos.length ? passos[i + 1] : null;
+    final distancia = _eu == null
+        ? null
+        : Geolocator.distanceBetween(_eu!.latitude, _eu!.longitude,
+            atual.ponto.latitude, atual.ponto.longitude);
+    const fundo = Color(0xFF0B5E55);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+            decoration: BoxDecoration(
+              color: fundo,
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: const [
+                BoxShadow(
+                    color: Colors.black26, blurRadius: 8, offset: Offset(0, 2))
+              ],
+            ),
+            child: Row(
+              children: [
+                Column(
+                  children: [
+                    Icon(_iconeManobra(atual.manobra),
+                        color: Colors.white, size: 44),
+                    if (distancia != null)
+                      Text(_distancia(distancia),
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold)),
+                  ],
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text(
+                    atual.texto.isEmpty ? 'Siga em frente' : atual.texto,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w600,
+                        height: 1.2),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (depois != null)
+            Container(
+              margin: const EdgeInsets.only(left: 0),
+              padding: const EdgeInsets.fromLTRB(14, 8, 14, 10),
+              decoration: const BoxDecoration(
+                color: Color(0xFF094B44),
+                borderRadius:
+                    BorderRadius.vertical(bottom: Radius.circular(14)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('Depois,',
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600)),
+                  const SizedBox(width: 6),
+                  Icon(_iconeManobra(depois.manobra),
+                      color: Colors.white, size: 22),
+                ],
+              ),
+            ),
         ],
       ),
     );
