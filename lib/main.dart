@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
+import 'creditos.dart';
 import 'home_page.dart';
 import 'login_page.dart';
 import 'cores.dart';
@@ -29,7 +30,10 @@ class PiraCarMotoristaApp extends StatelessWidget {
             return const Scaffold(
                 body: Center(child: CircularProgressIndicator()));
           }
-          return snap.hasData ? const HomePage() : const LoginPage();
+          return snap.hasData
+              ? const VerificaVersao(
+                  campo: 'versaoMinimaMotorista', child: HomePage())
+              : const LoginPage();
         },
       ),
       ),

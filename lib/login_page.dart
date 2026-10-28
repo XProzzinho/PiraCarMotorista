@@ -256,6 +256,8 @@ class _LoginPageState extends State<LoginPage> {
         ),
         const SizedBox(height: 28),
         const Center(child: CreditosRodape()),
+        const SizedBox(height: 4),
+        const Center(child: TextoVersao()),
       ],
     );
   }

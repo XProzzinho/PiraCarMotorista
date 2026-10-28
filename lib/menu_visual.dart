@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'cores.dart';
+import 'creditos.dart';
 
 /// Peças do menu lateral (três tracinhos), iguais nos três apps PiraCar.
 
@@ -43,6 +44,8 @@ class GavetaPiraCar extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 12, color: corMenuIcone)),
             ),
+            const SizedBox(height: 4),
+            const Center(child: TextoVersao()),
           ],
         ],
       ),
