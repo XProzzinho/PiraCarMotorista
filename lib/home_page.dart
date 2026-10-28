@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'cadastro_veiculo.dart';
 import 'categorias.dart';
@@ -1763,6 +1764,11 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           ),
         const Text('O pagamento é feito direto pelo passageiro no fim.',
             style: TextStyle(fontSize: 12, color: Colors.black54)),
+        const SizedBox(height: 10),
+        _BotoesNavegacao(
+          alvo: c[indoBuscar ? 'origem' : 'destino'],
+          rotulo: indoBuscar ? 'até o passageiro' : 'até o destino',
+        ),
         if (_proximaId != null) ...[
           const SizedBox(height: 8),
           Container(
@@ -2060,6 +2066,74 @@ class _Bloqueado extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Abre a rota no Google Maps ou no Waze (até o passageiro ou o destino).
+class _BotoesNavegacao extends StatelessWidget {
+  const _BotoesNavegacao({required this.alvo, required this.rotulo});
+
+  final dynamic alvo;
+  final String rotulo;
+
+  Future<void> _abrir(BuildContext context, Uri uri) async {
+    try {
+      final ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (!ok && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Não consegui abrir o aplicativo.')));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Não consegui abrir o aplicativo.')));
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (alvo is! GeoPoint) return const SizedBox.shrink();
+    final g = alvo as GeoPoint;
+    final ll = '${g.latitude},${g.longitude}';
+    final maps = Uri.parse(
+        'https://www.google.com/maps/dir/?api=1&destination=$ll&travelmode=driving');
+    final waze = Uri.parse('https://waze.com/ul?ll=$ll&navigate=yes');
+
+    Widget botao(String texto, Color cor, IconData icone, Uri uri) => Expanded(
+          child: OutlinedButton.icon(
+            onPressed: () => _abrir(context, uri),
+            icon: Icon(icone, color: cor, size: 20),
+            label: Text(texto),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(48),
+              foregroundColor: const Color(0xFF0F172A),
+              side: const BorderSide(color: Color(0xFFE2E8F0), width: 1.5),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14)),
+              textStyle:
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+            ),
+          ),
+        );
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Navegar $rotulo com:',
+            style: const TextStyle(fontSize: 13, color: Colors.black54)),
+        const SizedBox(height: 6),
+        Row(
+          children: [
+            botao('Google Maps', const Color(0xFF34A853), Icons.map_outlined,
+                maps),
+            const SizedBox(width: 10),
+            botao('Waze', const Color(0xFF33CCFF), Icons.navigation_outlined,
+                waze),
+          ],
+        ),
+      ],
     );
   }
 }
