@@ -10,6 +10,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import 'cadastro_veiculo.dart';
+import 'categorias.dart';
 import 'excluir_conta.dart';
 import 'aviso.dart';
 import 'carro_icone.dart';
@@ -534,6 +535,10 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   Timer? _reavaliador;
 
   bool _paraMim(Map<String, dynamic> m) {
+    // só corridas da(s) categoria(s) em que o motorista roda
+    if (!motoristaAtende(widget.dados, m['categoria'] as String?)) {
+      return false;
+    }
     if (m['ofertadoPara'] == _uid) return true;
     final ref = m['ofertadoEm'] ?? m['criadoEm'];
     if (ref is Timestamp) {
@@ -1561,13 +1566,14 @@ class _MapaMotoristaState extends State<_MapaMotorista>
                 color: Colors.black,
                 borderRadius: BorderRadius.circular(6),
               ),
-              child: const Row(
+              child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.directions_car, color: Colors.white, size: 15),
-                  SizedBox(width: 4),
-                  Text('PiraCar',
-                      style: TextStyle(
+                  const Icon(Icons.directions_car,
+                      color: Colors.white, size: 15),
+                  const SizedBox(width: 4),
+                  Text(categoriaPorId(d['categoria'] as String?).nome,
+                      style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.w700,
                           fontSize: 13)),
@@ -1942,7 +1948,8 @@ class _ConfiguracoesMotorista extends StatelessWidget {
                 LinhaDado('Nome completo', (d['nome'] ?? '').toString()),
                 LinhaDado('Placa', (d['placa'] ?? '').toString()),
                 LinhaDado('Carro', (d['carro'] ?? '').toString()),
-                LinhaDado('Cor', (d['cor'] ?? '').toString(), ultima: true),
+                LinhaDado('Cor', (d['cor'] ?? '').toString()),
+                LinhaDado('Categorias', nomesCategorias(d), ultima: true),
               ]),
               const SizedBox(height: 12),
               Container(
