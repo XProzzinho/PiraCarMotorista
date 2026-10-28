@@ -19,7 +19,7 @@ class Categoria {
   final double multiplicador;
 }
 
-const catPiracar = Categoria('piracar', 'PiraCar', 'Carro do dia a dia', 1.0);
+const catPiracar = Categoria('piracar', 'Bora Car', 'Carro do dia a dia', 1.0);
 const catSedan = Categoria('sedan', 'Sedan', 'Mais espaço no porta-malas', 1.2);
 const catConforto =
     Categoria('conforto', 'Conforto', 'Carros novos e espaçosos', 1.4);
@@ -42,7 +42,7 @@ List<String> categoriasDoMotorista(Map<String, dynamic>? dados) {
 bool motoristaAtende(Map<String, dynamic>? dados, String? categoriaCorrida) =>
     categoriasDoMotorista(dados).contains(categoriaCorrida ?? 'piracar');
 
-/// Texto curto: "PiraCar e Sedan".
+/// Texto curto: "Bora Car e Sedan".
 String nomesCategorias(Map<String, dynamic>? dados) =>
     categoriasDoMotorista(dados)
         .map((id) => categoriaPorId(id).nome)
@@ -299,7 +299,7 @@ class CartaoCategoria extends StatelessWidget {
                       categoria.id == 'piracar'
                           ? Text.rich(
                               TextSpan(children: [
-                                TextSpan(text: 'Pira'),
+                                TextSpan(text: 'Bora '),
                                 TextSpan(
                                     text: 'Car',
                                     style:

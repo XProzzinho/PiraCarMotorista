@@ -121,7 +121,7 @@ Future<Rota?> _rotaOsrm(LatLng origem, LatLng destino) async {
         '${destino.longitude},${destino.latitude}'
         '?overview=full&geometries=polyline&alternatives=true&steps=true');
     final resp = await http
-        .get(url, headers: {'User-Agent': 'PiraCar'})
+        .get(url, headers: {'User-Agent': 'Bora Car'})
         .timeout(const Duration(seconds: 12));
     if (resp.statusCode != 200) {
       erroRota += ' | OSRM: erro ${resp.statusCode}';

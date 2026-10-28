@@ -120,7 +120,7 @@ Future<void> notificarSaldo(int saldo) async {
         '${reais(custoNegativo)}. Faça uma recarga na loja.';
   } else {
     titulo = 'Seu saldo está acabando';
-    texto = 'Restam ${reais(saldo)}. Faça uma recarga na loja do PiraCar.';
+    texto = 'Restam ${reais(saldo)}. Faça uma recarga na loja do Bora Car.';
   }
   try {
     await _notificacoes.show(

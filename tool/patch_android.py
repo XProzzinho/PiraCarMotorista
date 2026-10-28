@@ -23,6 +23,7 @@ meta = (
     'android:value="' + key + '"/>'
 )
 t = re.sub(r"(<application[^>]*>)", lambda m: m.group(1) + meta, t, count=1)
+t = re.sub(r'android:label="[^"]*"', 'android:label="Bora Car Motorista"', t, count=1)
 mf.write_text(t)
 
 # 2) settings.gradle: plugin do Google Services
