@@ -10,27 +10,40 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 const chavePix = '+5534999116260';
 const chavePixTexto = '(34) 99911-6260';
 
-/// Com quantos tokens o motorista começa a ser avisado.
-const avisoTokens = 10;
+// Saldo em reais, guardado em centavos (users/{uid}.saldoCentavos).
+// Cada corrida aceita custa R$ 0,50 com saldo positivo e R$ 1,00 com
+// saldo zerado ou negativo. O saldo pode ficar negativo até -R$ 10,00.
+const custoPositivo = 50;
+const custoNegativo = 100;
+const limiteNegativo = -1000;
 
-class PacoteTokens {
-  final int quantidade;
-  final double preco;
-  const PacoteTokens(this.quantidade, this.preco);
+/// Abaixo disso (R$ 5,00) o motorista é avisado que o saldo está baixo.
+const avisoSaldo = 500;
+
+/// Recargas da loja, em reais.
+const recargas = [5, 10];
+
+int custoCorrida(int saldo) => saldo > 0 ? custoPositivo : custoNegativo;
+
+/// Ainda dá para aceitar mais uma corrida sem passar de -R$ 10,00?
+bool podeRodar(int saldo) => saldo - custoCorrida(saldo) >= limiteNegativo;
+
+/// Formata centavos como dinheiro: 750 -> "R$ 7,50", -300 -> "-R$ 3,00".
+String reais(int centavos) {
+  final s = (centavos.abs() / 100).toStringAsFixed(2).replaceAll('.', ',');
+  return '${centavos < 0 ? '-' : ''}R\$ $s';
 }
-
-const pacotes = [PacoteTokens(10, 5), PacoteTokens(20, 10)];
 
 const _azulNoite = Color(0xFF0B2545);
 const _amarelo = Color(0xFFFFC24B);
 const _verde = Color(0xFF2E7D32);
 
-String _real(num v) =>
-    'R\$ ${v.toDouble().toStringAsFixed(2).replaceAll('.', ',')}';
-
-int saldoTokens(Map<String, dynamic>? dados) {
-  final t = dados?['tokens'];
-  return t is num ? t.toInt() : 0;
+/// Saldo em centavos. Quem ainda tem tokens antigos vale R$ 0,50 cada.
+int saldoCentavos(Map<String, dynamic>? dados) {
+  final s = dados?['saldoCentavos'];
+  if (s is num) return s.toInt();
+  final antigo = dados?['tokens'];
+  return antigo is num ? antigo.toInt() * custoPositivo : 0;
 }
 
 // ---------- Notificação ----------
@@ -52,13 +65,21 @@ Future<void> iniciarNotificacoes() async {
   } catch (_) {}
 }
 
-Future<void> notificarTokens(int saldo) async {
+Future<void> notificarSaldo(int saldo) async {
   await iniciarNotificacoes();
-  final titulo =
-      saldo <= 0 ? 'Seus tokens acabaram' : 'Seus tokens estão acabando';
-  final texto = saldo <= 0
-      ? 'Você ficou offline. Compre mais tokens na loja para voltar a receber corridas.'
-      : 'Restam $saldo ${saldo == 1 ? 'token' : 'tokens'}. Compre mais na loja do PiraCar.';
+  final String titulo, texto;
+  if (!podeRodar(saldo)) {
+    titulo = 'Seu saldo acabou';
+    texto = 'Você chegou no limite de ${reais(limiteNegativo)} e ficou '
+        'offline. Faça uma recarga para voltar a receber corridas.';
+  } else if (saldo <= 0) {
+    titulo = 'Saldo negativo';
+    texto = 'Seu saldo está em ${reais(saldo)}. Agora cada corrida custa '
+        '${reais(custoNegativo)}. Faça uma recarga na loja.';
+  } else {
+    titulo = 'Seu saldo está acabando';
+    texto = 'Restam ${reais(saldo)}. Faça uma recarga na loja do PiraCar.';
+  }
   try {
     await _notificacoes.show(
       7,
@@ -67,8 +88,8 @@ Future<void> notificarTokens(int saldo) async {
       const NotificationDetails(
         android: AndroidNotificationDetails(
           'tokens',
-          'Tokens',
-          channelDescription: 'Avisos de saldo de tokens',
+          'Saldo',
+          channelDescription: 'Avisos de saldo',
           importance: Importance.high,
           priority: Priority.high,
         ),
@@ -79,31 +100,32 @@ Future<void> notificarTokens(int saldo) async {
 
 // ---------- Selo de saldo (barra do topo) ----------
 
-class SeloTokens extends StatelessWidget {
-  const SeloTokens({super.key, required this.saldo, required this.onTap});
+class SeloSaldo extends StatelessWidget {
+  const SeloSaldo({super.key, required this.saldo, required this.onTap});
 
   final int saldo;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final baixo = saldo <= avisoTokens;
+    final cor = saldo <= 0
+        ? Colors.red.shade600
+        : (saldo <= avisoSaldo ? Colors.orange.shade600 : _azulNoite);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         decoration: BoxDecoration(
-          color: saldo <= 0
-              ? Colors.red.shade600
-              : (baixo ? Colors.orange.shade600 : _azulNoite),
+          color: cor,
           borderRadius: BorderRadius.circular(20),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.toll, color: _amarelo, size: 18),
-            const SizedBox(width: 4),
-            Text('$saldo',
+            const Icon(Icons.account_balance_wallet_outlined,
+                color: _amarelo, size: 17),
+            const SizedBox(width: 5),
+            Text(reais(saldo),
                 style: const TextStyle(
                     color: Colors.white, fontWeight: FontWeight.bold)),
           ],
@@ -113,18 +135,18 @@ class SeloTokens extends StatelessWidget {
   }
 }
 
-// ---------- Loja ----------
+// ---------- Loja (recargas) ----------
 
-class LojaTokensPage extends StatefulWidget {
-  const LojaTokensPage({super.key});
+class LojaSaldoPage extends StatefulWidget {
+  const LojaSaldoPage({super.key});
 
   @override
-  State<LojaTokensPage> createState() => _LojaTokensPageState();
+  State<LojaSaldoPage> createState() => _LojaSaldoPageState();
 }
 
-class _LojaTokensPageState extends State<LojaTokensPage> {
+class _LojaSaldoPageState extends State<LojaSaldoPage> {
   final _uid = FirebaseAuth.instance.currentUser!.uid;
-  PacoteTokens? _escolhido;
+  int? _escolhida; // em reais
   bool _enviando = false;
 
   DocumentReference<Map<String, dynamic>> get _ref =>
@@ -140,21 +162,21 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
     _aviso('Chave Pix copiada!');
   }
 
-  // O motorista avisa que pagou; o admin confere o Pix e libera os tokens.
+  // O motorista avisa que pagou; o admin confere o Pix e libera o saldo.
   Future<void> _jaPaguei() async {
-    final p = _escolhido;
-    if (p == null) return;
+    final v = _escolhida;
+    if (v == null) return;
     setState(() => _enviando = true);
     try {
       await _ref.update({
         'pedidoTokens': {
-          'quantidade': p.quantidade,
-          'valor': p.preco,
+          'valor': v,
+          'centavos': v * 100,
           'pedidoEm': FieldValue.serverTimestamp(),
         },
       });
-      _aviso('Pedido enviado! Os tokens entram assim que o Pix for conferido.');
-      setState(() => _escolhido = null);
+      _aviso('Pedido enviado! O saldo entra assim que o Pix for conferido.');
+      setState(() => _escolhida = null);
     } catch (e) {
       _aviso('Não foi possível enviar o pedido: $e');
     } finally {
@@ -175,7 +197,7 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
     return Scaffold(
       backgroundColor: const Color(0xFFF4F6FA),
       appBar: AppBar(
-        title: const Text('Loja de tokens'),
+        title: const Text('Recarregar saldo'),
         centerTitle: true,
         backgroundColor: _azulNoite,
         foregroundColor: Colors.white,
@@ -184,34 +206,33 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
         stream: _ref.snapshots(),
         builder: (context, snap) {
           final dados = snap.data?.data();
-          final saldo = saldoTokens(dados);
+          final saldo = saldoCentavos(dados);
           final pedido = dados?['pedidoTokens'];
           return ListView(
             padding: const EdgeInsets.all(16),
             children: [
               _cartaoSaldo(saldo),
+              const SizedBox(height: 12),
+              _regras(),
               const SizedBox(height: 16),
               if (pedido is Map)
                 _pedidoPendente(pedido)
               else ...[
-                const Text('Escolha um pacote',
+                const Text('Escolha a recarga',
                     style:
                         TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 4),
-                const Text('Cada corrida aceita usa 1 token.',
-                    style: TextStyle(color: Colors.black54)),
                 const SizedBox(height: 12),
                 Row(
                   children: [
-                    for (final p in pacotes) ...[
-                      Expanded(child: _cartaoPacote(p)),
-                      if (p != pacotes.last) const SizedBox(width: 12),
+                    for (final v in recargas) ...[
+                      Expanded(child: _cartaoRecarga(v)),
+                      if (v != recargas.last) const SizedBox(width: 12),
                     ],
                   ],
                 ),
-                if (_escolhido != null) ...[
+                if (_escolhida != null) ...[
                   const SizedBox(height: 16),
-                  _pagamento(_escolhido!),
+                  _pagamento(_escolhida!),
                 ],
               ],
             ],
@@ -222,7 +243,7 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
   }
 
   Widget _cartaoSaldo(int saldo) {
-    final baixo = saldo <= avisoTokens;
+    final negativo = saldo < 0;
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -234,7 +255,8 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
           const CircleAvatar(
             radius: 26,
             backgroundColor: _amarelo,
-            child: Icon(Icons.toll, color: _azulNoite, size: 30),
+            child: Icon(Icons.account_balance_wallet,
+                color: _azulNoite, size: 28),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -243,16 +265,23 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
               children: [
                 const Text('Seu saldo',
                     style: TextStyle(color: Color(0xFFC9D6EA))),
-                Text('$saldo ${saldo == 1 ? 'token' : 'tokens'}',
-                    style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 26,
+                Text(reais(saldo),
+                    style: TextStyle(
+                        color: negativo
+                            ? const Color(0xFFFF8A80)
+                            : Colors.white,
+                        fontSize: 28,
                         fontWeight: FontWeight.w800)),
-                if (saldo <= 0)
-                  const Text('Sem tokens: você não pode ficar online.',
-                      style: TextStyle(color: Color(0xFFFF8A80)))
-                else if (baixo)
-                  const Text('Saldo baixo, compre mais tokens.',
+                if (!podeRodar(saldo))
+                  Text(
+                      'Limite de ${reais(limiteNegativo)} atingido: '
+                      'recarregue para voltar a rodar.',
+                      style: const TextStyle(color: Color(0xFFFF8A80)))
+                else if (negativo)
+                  const Text('Saldo negativo: faça uma recarga.',
+                      style: TextStyle(color: Color(0xFFFFCC80)))
+                else if (saldo <= avisoSaldo)
+                  const Text('Saldo baixo, faça uma recarga.',
                       style: TextStyle(color: Color(0xFFFFCC80))),
               ],
             ),
@@ -262,11 +291,41 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
     );
   }
 
-  Widget _cartaoPacote(PacoteTokens p) {
-    final sel = _escolhido == p;
+  Widget _regras() {
+    Widget linha(IconData i, String t) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 3),
+          child: Row(
+            children: [
+              Icon(i, size: 18, color: Colors.black54),
+              const SizedBox(width: 8),
+              Expanded(child: Text(t, style: const TextStyle(fontSize: 13.5))),
+            ],
+          ),
+        );
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          linha(Icons.check_circle_outline,
+              'Com saldo positivo, cada corrida custa ${reais(custoPositivo)}.'),
+          linha(Icons.remove_circle_outline,
+              'Com saldo zerado ou negativo, cada corrida custa ${reais(custoNegativo)}.'),
+          linha(Icons.block,
+              'O saldo pode ficar negativo até ${reais(limiteNegativo)}.'),
+        ],
+      ),
+    );
+  }
+
+  Widget _cartaoRecarga(int v) {
+    final sel = _escolhida == v;
     return InkWell(
       borderRadius: BorderRadius.circular(16),
-      onTap: () => setState(() => _escolhido = p),
+      onTap: () => setState(() => _escolhida = v),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
         decoration: BoxDecoration(
@@ -278,16 +337,12 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
         ),
         child: Column(
           children: [
-            const Icon(Icons.toll, color: Color(0xFFFFB300), size: 34),
+            const Icon(Icons.add_card, color: Color(0xFFFFB300), size: 32),
             const SizedBox(height: 6),
-            Text('${p.quantidade} tokens',
+            Text(reais(v * 100),
                 style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.w800)),
-            const SizedBox(height: 2),
-            Text(_real(p.preco),
-                style: const TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700, color: _verde)),
-            Text('${_real(p.preco / p.quantidade)} por corrida',
+                    fontSize: 20, fontWeight: FontWeight.w800, color: _verde)),
+            Text('${v * 100 ~/ custoPositivo} corridas',
                 style: const TextStyle(fontSize: 12, color: Colors.black54)),
           ],
         ),
@@ -295,7 +350,7 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
     );
   }
 
-  Widget _pagamento(PacoteTokens p) {
+  Widget _pagamento(int v) {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -305,7 +360,7 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text('Pague ${_real(p.preco)} por Pix',
+          Text('Pague ${reais(v * 100)} por Pix',
               style:
                   const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
@@ -342,7 +397,7 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Depois de pagar, toque em "Já fiz o Pix". Os tokens entram '
+            'Depois de pagar, toque em "Já fiz o Pix". O saldo entra '
             'assim que o pagamento for conferido.',
             style: TextStyle(fontSize: 13, color: Colors.black54),
           ),
@@ -369,8 +424,7 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
   }
 
   Widget _pedidoPendente(Map pedido) {
-    final qtd = pedido['quantidade'];
-    final valor = pedido['valor'];
+    final v = pedido['valor'];
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -390,10 +444,11 @@ class _LojaTokensPageState extends State<LojaTokensPage> {
             ],
           ),
           const SizedBox(height: 8),
-          Text('Pedido de $qtd tokens'
-              '${valor is num ? ' (${_real(valor)})' : ''}.'),
+          Text(v is num
+              ? 'Recarga de ${reais((v * 100).round())}.'
+              : 'Recarga pedida.'),
           const Text(
-              'Assim que o Pix for conferido, os tokens entram no seu saldo.',
+              'Assim que o Pix for conferido, o valor entra no seu saldo.',
               style: TextStyle(color: Colors.black54)),
           const SizedBox(height: 8),
           Align(

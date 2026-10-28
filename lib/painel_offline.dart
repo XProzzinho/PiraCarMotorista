@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'tokens.dart';
+
 const _azulNoite = Color(0xFF0B2545);
 const _azul = Color(0xFF1E88E5);
 const _azulEscuro = Color(0xFF1565C0);
@@ -28,7 +30,7 @@ class PainelOffline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final semTokens = saldo <= 0;
+    final semTokens = !podeRodar(saldo);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -67,7 +69,7 @@ class PainelOffline extends StatelessWidget {
                     const SizedBox(height: 3),
                     Text(
                       semTokens
-                          ? 'Sem tokens. Compre mais para rodar.'
+                          ? 'Saldo no limite. Recarregue para rodar.'
                           : 'Pronto pra rodar em Pirapora?',
                       style: const TextStyle(
                           color: Color(0xFFC9D6EA), fontSize: 13.5),
@@ -91,8 +93,8 @@ class PainelOffline extends StatelessWidget {
                 textStyle:
                     const TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
               ),
-              icon: const Icon(Icons.toll),
-              label: const Text('Comprar tokens'),
+              icon: const Icon(Icons.account_balance_wallet),
+              label: const Text('Recarregar saldo'),
             ),
           )
         else
@@ -100,14 +102,16 @@ class PainelOffline extends StatelessWidget {
         if (!semTokens && saldo <= aviso)
           TextButton(
             onPressed: onLoja,
-            child: const Text('Saldo baixo, comprar tokens'),
+            child: Text(saldo <= 0
+                ? 'Saldo negativo (${reais(saldo)}), recarregar'
+                : 'Saldo baixo, recarregar'),
           ),
       ],
     );
   }
 }
 
-/// Ganhos hoje, corridas hoje e tokens.
+/// Ganhos hoje, corridas hoje e saldo.
 class ResumoDia extends StatelessWidget {
   const ResumoDia({
     super.key,
@@ -152,7 +156,7 @@ class ResumoDia extends StatelessWidget {
             Expanded(child: _Mini('Corridas hoje', '$corridas')),
             const SizedBox(width: 8),
             Expanded(
-              child: _Mini('Tokens', '$saldo',
+              child: _Mini('Saldo', reais(saldo),
                   alerta: saldo <= aviso, onTap: onLoja),
             ),
           ],
