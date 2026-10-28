@@ -102,7 +102,7 @@ class VerificaVersao extends StatelessWidget {
                   Text(
                       'Esta versão ($versaoApp) não funciona mais. '
                       'Baixe a versão $minima ou mais nova para continuar '
-                      'usando o PiraCar.',
+                      'usando o Uai Car.',
                       textAlign: TextAlign.center,
                       style: const TextStyle(fontSize: 15)),
                 ],

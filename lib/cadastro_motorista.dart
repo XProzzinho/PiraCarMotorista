@@ -99,7 +99,7 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
           return 'Data de nascimento inválida. Use DD/MM/AAAA.';
         }
         if (idade(_nascimento.text) < 18) {
-          return 'Para dirigir no PiraCar é preciso ter 18 anos ou mais.';
+          return 'Para dirigir no Uai Car é preciso ter 18 anos ou mais.';
         }
         if (soDigitos(_telefone.text).length < 10) {
           return 'Digite o telefone com DDD.';
@@ -390,7 +390,7 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
                   fontSize: 17, fontWeight: FontWeight.w800, color: corTexto)),
           const SizedBox(height: 4),
           const Text(
-              'O PiraCar já vem marcado. Se o seu carro for sedan ou '
+              'O Uai Car já vem marcado. Se o seu carro for sedan ou '
               'confortável, marque mais uma (é opcional).',
               style: TextStyle(fontSize: 14, color: corTextoSuave)),
           const SizedBox(height: 12),

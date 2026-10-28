@@ -21,7 +21,7 @@ class PiraCarMotoristaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ObservadorTema(
       builder: (context) => MaterialApp(
-      title: 'PiraCar Motorista',
+      title: 'Uai Car Motorista',
       debugShowCheckedModeBanner: false,
       theme: temaPiraCar(const Color(0xFF1E88E5)),
       home: StreamBuilder<User?>(
