@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -11,11 +13,46 @@ const chavePix = '+5534999116260';
 const chavePixTexto = '(34) 99911-6260';
 
 // Saldo em reais, guardado em centavos (users/{uid}.saldoCentavos).
-// Cada corrida aceita custa R$ 0,50 com saldo positivo e R$ 1,00 com
-// saldo zerado ou negativo. O saldo pode ficar negativo até -R$ 10,00.
-const custoPositivo = 50;
-const custoNegativo = 100;
+// Cada corrida aceita custa o valor definido pela administração
+// (config/app.custoCorridaCentavos; padrão R$ 0,50) com saldo positivo, e
+// R$ 1,00 (ou o valor da administração, se for maior) com saldo zerado ou
+// negativo. O saldo pode ficar negativo até -R$ 10,00.
+const custoBase = 50;
+const custoNegativoMinimo = 100;
 const limiteNegativo = -1000;
+
+/// Valor por corrida definido no app da administração (em centavos).
+final custoConfig = ValueNotifier<int>(custoBase);
+StreamSubscription? _subCusto;
+
+/// Começa a acompanhar o valor por corrida definido pela administração.
+void ouvirCustoCorrida() {
+  _subCusto ??= FirebaseFirestore.instance
+      .collection('config')
+      .doc('app')
+      .snapshots()
+      .listen((s) {
+    final v = s.data()?['custoCorridaCentavos'];
+    custoConfig.value = v is num && v > 0 ? v.toInt() : custoBase;
+  }, onError: (_) {});
+}
+
+int get custoPositivo => custoConfig.value;
+int get custoNegativo =>
+    custoPositivo > custoNegativoMinimo ? custoPositivo : custoNegativoMinimo;
+
+/// Lê o valor por corrida direto do servidor (usado ao aceitar).
+Future<int> custoCorridaAtual() async {
+  try {
+    final s = await FirebaseFirestore.instance
+        .collection('config')
+        .doc('app')
+        .get();
+    final v = s.data()?['custoCorridaCentavos'];
+    if (v is num && v > 0) custoConfig.value = v.toInt();
+  } catch (_) {}
+  return custoConfig.value;
+}
 
 /// Abaixo disso (R$ 5,00) o motorista é avisado que o saldo está baixo.
 const avisoSaldo = 500;
@@ -47,7 +84,7 @@ int saldoCentavos(Map<String, dynamic>? dados) {
   final s = dados?['saldoCentavos'];
   if (s is num) return s.toInt();
   final antigo = dados?['tokens'];
-  return antigo is num ? antigo.toInt() * custoPositivo : 0;
+  return antigo is num ? antigo.toInt() * custoBase : 0;
 }
 
 // ---------- Notificação ----------

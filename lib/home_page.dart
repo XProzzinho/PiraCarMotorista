@@ -180,6 +180,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   LatLng? _pontoDirecao; // último ponto usado para calcular a direção
   int _passo = 1; // próxima manobra da rota (modo navegação)
   double _zoom3d = 17.5;
+  double _giroMapa = 0; // para onde o mapa está girado (bearing da câmera)
   bool _online = false;
 
   BitmapDescriptor _iconeCarro =
@@ -193,7 +194,9 @@ class _MapaMotoristaState extends State<_MapaMotorista>
 
   // Oferta de corrida (cartão grande, estilo Uber)
   List<QueryDocumentSnapshot<Map<String, dynamic>>> _pedidos = [];
-  final Set<String> _recusados = {};
+  // Pedido recusado (ou que passou o tempo) -> rodada da oferta
+  // (ofertadoEm). Se o passageiro oferecer de novo, aparece de novo.
+  final Map<String, Object?> _recusados = {};
   String? _ofertaId;
   Rota? _ofertaAteMim;
   Rota? _ofertaViagem;
@@ -211,6 +214,10 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   DateTime _ultimoEnvio = DateTime.fromMillisecondsSinceEpoch(0);
   bool _aceitando = false;
 
+  // Próxima corrida, aceita antes de terminar a atual (fila).
+  String? _proximaId;
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _subProxima;
+
   // Rota
   Rota? _rota;
   LatLng? _rotaOrigem;
@@ -225,6 +232,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     _iniciarLocalizacao();
     _retomarCorrida();
     iniciarNotificacoes();
+    ouvirCustoCorrida();
   }
 
   int get _saldo => saldoCentavos(widget.dados);
@@ -260,24 +268,69 @@ class _MapaMotoristaState extends State<_MapaMotorista>
 
   bool get _disponivel => _online && _corridaId == null;
 
+  /// Distância (em linha reta) que falta para deixar o passageiro.
+  double? get _faltaParaDeixar {
+    final c = _corrida;
+    final dest = _ll(c?['destino']);
+    if (_eu == null || dest == null || c?['status'] != 'em_andamento') {
+      return null;
+    }
+    return Geolocator.distanceBetween(
+        _eu!.latitude, _eu!.longitude, dest.latitude, dest.longitude);
+  }
+
+  /// Perto de deixar o passageiro (até 1,2 km) e ainda sem próxima
+  /// corrida: já pode receber a próxima.
+  bool get _quaseLivre {
+    if (!_online || _corridaId == null || _proximaId != null) return false;
+    final falta = _faltaParaDeixar;
+    return falta != null && falta <= 1200;
+  }
+
+  /// Pode receber oferta agora (livre, ou terminando a corrida).
+  bool get _podeReceber => _disponivel || _quaseLivre;
+
   Future<void> _publicarPresenca({bool forcar = false}) async {
-    if (!_disponivel || _eu == null) return;
+    if (!_podeReceber || _eu == null) return;
     final agora = DateTime.now();
     if (!forcar && agora.difference(_ultimaPresenca).inSeconds < 8) return;
     _ultimaPresenca = agora;
+    final quase = !_disponivel;
+    final dest = _ll(_corrida?['destino']);
     try {
       await _db.collection('users').doc(_uid).update({
         'online': true,
         'posicao': GeoPoint(_eu!.latitude, _eu!.longitude),
         'direcao': _direcao,
         'posicaoEm': FieldValue.serverTimestamp(),
+        'quaseLivre': quase,
+        'livreEm': quase && dest != null
+            ? GeoPoint(dest.latitude, dest.longitude)
+            : FieldValue.delete(),
+        'restanteMetros': quase ? (_faltaParaDeixar ?? 0).round() : 0,
       });
     } catch (_) {}
   }
 
+  // Liga/desliga a presença conforme o motorista fica quase livre.
+  void _conferirFila() {
+    if (_corridaId == null) return;
+    final quer = _quaseLivre;
+    if (quer && _batida == null) {
+      _ligarPresenca(true);
+      _escolherOferta();
+    } else if (!quer && _batida != null) {
+      _ligarPresenca(false);
+      if (_ofertaId != null && _proximaId == null) _mostrarOferta(null);
+    }
+  }
+
   Future<void> _sairDoMapa() async {
     try {
-      await _db.collection('users').doc(_uid).update({'online': false});
+      await _db
+          .collection('users')
+          .doc(_uid)
+          .update({'online': false, 'quaseLivre': false});
     } catch (_) {}
   }
 
@@ -313,6 +366,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     _subPos?.cancel();
     _subPedidos?.cancel();
     _subCorrida?.cancel();
+    _subProxima?.cancel();
     super.dispose();
   }
 
@@ -402,6 +456,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     });
     if (_seguir) _camera3d();
     _enviarPosicao(ll);
+    _conferirFila();
     _publicarPresenca();
     _atualizarRota();
   }
@@ -475,7 +530,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   // a um motorista por vez (campo ofertadoPara). Só aparece para mim o
   // pedido oferecido a mim. Se o despacho parar por mais de 60 s (app do
   // passageiro fechado, por exemplo), o pedido fica aberto para todos.
-  static const _tempoOferta = 15;
+  static const _tempoOferta = 20;
   Timer? _reavaliador;
 
   bool _paraMim(Map<String, dynamic> m) {
@@ -490,12 +545,13 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   void _avisarNovos() {
     var novo = false;
     for (final d in _pedidos) {
-      if (_paraMim(d.data()) && _vistos.add(d.id) && !_primeiraLista) {
+      final rodada = '${d.id}|${d.data()['ofertadoEm']}';
+      if (_paraMim(d.data()) && _vistos.add(rodada) && !_primeiraLista) {
         novo = true;
       }
     }
     _primeiraLista = false;
-    if (novo && _online && _corridaId == null) _alertar();
+    if (novo && _online && _podeReceber) _alertar();
   }
 
   void _reavaliar() {
@@ -532,15 +588,18 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     return null;
   }
 
+  bool _recusei(QueryDocumentSnapshot<Map<String, dynamic>> d) =>
+      _recusados.containsKey(d.id) &&
+      _recusados[d.id] == d.data()['ofertadoEm'];
+
   int get _outrosPedidos =>
-      _visiveis.where((d) => !_recusados.contains(d.id)).length -
-      (_oferta != null ? 1 : 0);
+      _visiveis.where((d) => !_recusei(d)).length - (_oferta != null ? 1 : 0);
 
   void _escolherOferta() {
-    if (!_online || _corridaId != null) return;
+    if (!_online || !_podeReceber) return;
     if (_oferta != null) return; // continua mostrando a atual
     for (final d in _visiveis) {
-      if (!_recusados.contains(d.id)) {
+      if (!_recusei(d)) {
         _mostrarOferta(d.id);
         return;
       }
@@ -551,7 +610,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   void _recusarOferta({bool avisar = true}) {
     final id = _ofertaId;
     if (id != null) {
-      _recusados.add(id);
+      _recusados[id] = _oferta?['ofertadoEm'];
       // devolve o pedido para ir ao próximo motorista mais perto
       if (avisar && _oferta?['ofertadoPara'] == _uid) {
         _db.collection('corridas').doc(id).update({
@@ -578,9 +637,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     });
     final d = _oferta;
     if (id == null || d == null) {
-      if (_eu != null && _corridaId == null) {
-        _voltar3d();
-      }
+      if (_eu != null) _voltar3d();
       return;
     }
     final origem = _ll(d['origem']);
@@ -693,22 +750,31 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           .where('motoristaId', isEqualTo: _uid)
           .get();
       if (!mounted) return;
+      String? andamento, aceita;
       for (final d in q.docs) {
         final s = d.data()['status'];
-        if (s == 'aceita' || s == 'em_andamento') {
-          _acompanhar(d.id);
-          break;
-        }
+        if (s == 'em_andamento') andamento ??= d.id;
+        if (s == 'aceita') aceita ??= d.id;
+      }
+      if (andamento != null) {
+        _acompanhar(andamento);
+        if (aceita != null) _guardarProxima(aceita);
+      } else if (aceita != null) {
+        _acompanhar(aceita);
       }
     } catch (_) {}
   }
 
   Future<void> _aceitar(String id) async {
     setState(() => _aceitando = true);
+    // terminando outra corrida: esta fica na fila, para depois
+    final naFila = _corridaId != null;
     try {
       final ref = _db.collection('corridas').doc(id);
       final eu = _db.collection('users').doc(_uid);
-      // Aceitar a corrida desconta R$ 0,50 (ou R$ 1,00 com saldo negativo).
+      // Aceitar a corrida desconta o valor da administração (padrão
+      // R$ 0,50) ou R$ 1,00 com saldo negativo.
+      await custoCorridaAtual();
       await _db.runTransaction((tx) async {
         final snap = await tx.get(ref);
         final perfil = await tx.get(eu);
@@ -724,6 +790,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           'status': 'aceita',
           'motoristaId': _uid,
           'taxaCentavos': custo,
+          'naFila': naFila,
         });
         tx.update(eu, {'saldoCentavos': saldo - custo});
       });
@@ -733,7 +800,14 @@ class _MapaMotoristaState extends State<_MapaMotorista>
         _ofertaViagem = null;
       });
       _ligarPresenca(false); // ocupado: some do mapa do passageiro
-      _acompanhar(id);
+      if (naFila) {
+        _guardarProxima(id);
+        _aviso('Próxima corrida aceita! Termine esta e siga para o '
+            'próximo passageiro.');
+        if (_eu != null) _voltar3d();
+      } else {
+        _acompanhar(id);
+      }
     } catch (e) {
       _aviso(e is String ? e : 'Não foi possível aceitar: $e');
     } finally {
@@ -794,11 +868,42 @@ class _MapaMotoristaState extends State<_MapaMotorista>
       _rotaOrigem = null;
     });
     _aviso(msg);
+    final proxima = _proximaId;
+    if (proxima != null) {
+      // já tem a próxima corrida: vai buscar o próximo passageiro
+      _subProxima?.cancel();
+      _subProxima = null;
+      _proximaId = null;
+      _ligarPresenca(false);
+      _db
+          .collection('corridas')
+          .doc(proxima)
+          .update({'naFila': false}).catchError((_) {});
+      _acompanhar(proxima);
+      return;
+    }
     if (_eu != null) {
       _voltar3d();
     }
     if (_online) _ligarPresenca(true); // livre de novo
     _escolherOferta();
+  }
+
+  // Guarda a próxima corrida (fila) e fica de olho se o passageiro cancelar.
+  void _guardarProxima(String id) {
+    _subProxima?.cancel();
+    setState(() => _proximaId = id);
+    _subProxima =
+        _db.collection('corridas').doc(id).snapshots().listen((doc) {
+      final s = doc.data()?['status'];
+      if (!mounted || _proximaId != id) return;
+      if (s == 'cancelada' || s == null) {
+        _subProxima?.cancel();
+        _subProxima = null;
+        setState(() => _proximaId = null);
+        _aviso('O próximo passageiro cancelou a corrida.');
+      }
+    }, onError: (_) {});
   }
 
   // Ao fim da corrida, o motorista dá de 1 a 5 estrelas ao passageiro.
@@ -951,7 +1056,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     final origem = _ll(_corrida?['origem']);
     final destino = _ll(_corrida?['destino']);
     final corRota = status == 'aceita' ? Colors.green : _azul;
-    final oferta = _corridaId == null ? _oferta : null;
+    final oferta = _podeReceber ? _oferta : null;
     final ofOrigem = _ll(oferta?['origem']);
     final ofDestino = _ll(oferta?['destino']);
     final navegando = _navegando;
@@ -973,6 +1078,11 @@ class _MapaMotoristaState extends State<_MapaMotorista>
             compassEnabled: false,
             onCameraMove: (pos) {
               if (_seguir) _zoom3d = pos.zoom.clamp(14.0, 20.0);
+              // o carrinho fica "em pé" na tela (não achata com o mapa
+              // inclinado); gira conforme a direção e o giro do mapa
+              if ((pos.bearing - _giroMapa).abs() > 1.5) {
+                setState(() => _giroMapa = pos.bearing);
+              }
             },
             myLocationEnabled: false,
             myLocationButtonEnabled: false,
@@ -1013,8 +1123,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
                   position: _eu!,
                   icon: _iconeCarro,
                   anchor: const Offset(0.5, 0.5),
-                  flat: true,
-                  rotation: _direcao,
+                  flat: false,
+                  rotation: (_direcao - _giroMapa + 360) % 360,
                   zIndex: 3,
                   infoWindow: const InfoWindow(title: 'Você'),
                 ),
@@ -1306,7 +1416,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
       width: double.infinity,
       constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height *
-              (_corridaId == null && _oferta != null ? 0.6 : 0.45)),
+              (_podeReceber && _oferta != null ? 0.6 : 0.45)),
       decoration: const BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -1330,7 +1440,9 @@ class _MapaMotoristaState extends State<_MapaMotorista>
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
                 child: _corridaId != null
-                    ? _painelCorrida()
+                    ? (_quaseLivre && _oferta != null
+                        ? _cartaoOferta()
+                        : _painelCorrida())
                     : (_online
                         ? (_oferta != null
                             ? _cartaoOferta()
@@ -1392,17 +1504,33 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (_corridaId != null)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F0FE),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Text(
+              'Próxima corrida: o passageiro espera você terminar esta.',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF0B2545)),
+            ),
+          ),
         if (exclusiva)
           Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: TweenAnimationBuilder<double>(
-              key: ValueKey('tempo_$id'),
+              key: ValueKey('tempo_${id}_${d['ofertadoEm']}'),
               tween: Tween(begin: 1, end: 0),
               duration: const Duration(seconds: _tempoOferta),
               onEnd: () {
-                if (mounted && _ofertaId == id && _corridaId == null) {
-                  _recusarOferta(avisar: false);
-                }
+                // passou o tempo: devolve o pedido para o próximo
+                if (mounted && _ofertaId == id) _recusarOferta();
               },
               builder: (context, v, _) => Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1629,6 +1757,29 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           ),
         const Text('O pagamento é feito direto pelo passageiro no fim.',
             style: TextStyle(fontSize: 12, color: Colors.black54)),
+        if (_proximaId != null) ...[
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFE8F0FE),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.queue, size: 18, color: Color(0xFF276EF1)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                      'Próxima corrida aceita. Ao finalizar esta, a rota '
+                      'até o próximo passageiro aparece sozinha.',
+                      style: TextStyle(fontSize: 13)),
+                ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         if (indoBuscar) ...[
           SizedBox(
