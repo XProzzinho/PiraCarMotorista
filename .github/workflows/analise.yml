@@ -1,0 +1,25 @@
+name: Analise
+on:
+  push:
+    branches: [analise-codigo]
+jobs:
+  analise:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.24.5"
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Analisar
+        run: |
+          flutter analyze --no-pub --no-fatal-infos --no-fatal-warnings lib > analise.txt 2>&1 || true
+          python3 - <<'PY'
+          t = open('analise.txt').read()
+          linhas = [l.strip() for l in t.splitlines() if ' • ' in l]
+          msg = '\n'.join(linhas) or 'Nenhum problema encontrado'
+          msg = msg.replace('%', '%25').replace('\r', '%0D').replace('\n', '%0A')
+          print('::notice title=analise::' + msg)
+          PY
