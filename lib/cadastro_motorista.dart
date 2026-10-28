@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'cadastro_etapas.dart';
 import 'cadastro_veiculo.dart';
 import 'categorias.dart';
+import 'cores.dart';
 
 /// Cadastro do motorista em etapas:
 /// 1 Dados pessoais, 2 CNH, 3 Carro, 4 Foto de perfil, 5 E-mail e senha.
@@ -527,7 +528,7 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
         color: marcado && quadrada ? corAzul : null,
         borderRadius: BorderRadius.circular(quadrada ? 8 : 13),
         border: Border.all(
-            color: marcado ? corAzul : const Color(0xFFCBD5E1), width: 2),
+            color: marcado ? corAzul : ln(Color(0xFFCBD5E1)), width: 2),
       ),
       child: marcado
           ? (quadrada

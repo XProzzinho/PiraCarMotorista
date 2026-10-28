@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'cores.dart';
 
 /// Categorias de corrida do PiraCar.
 ///
@@ -276,11 +277,11 @@ class CartaoCategoria extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: selecionado ? const Color(0xFFF3F8FF) : Colors.white,
+        color: selecionado ? ta(Color(0xFFF3F8FF)) : sup(Colors.white),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(
-              color: selecionado ? azul : const Color(0xFFE2E8F0), width: 2),
+              color: selecionado ? azul : ln(Color(0xFFE2E8F0)), width: 2),
         ),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -296,7 +297,7 @@ class CartaoCategoria extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       categoria.id == 'piracar'
-                          ? const Text.rich(
+                          ? Text.rich(
                               TextSpan(children: [
                                 TextSpan(text: 'Pira'),
                                 TextSpan(
@@ -307,17 +308,17 @@ class CartaoCategoria extends StatelessWidget {
                               style: TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w900,
-                                  color: Color(0xFF0F172A)),
+                                  color: tx(Color(0xFF0F172A))),
                             )
                           : Text(categoria.nome,
-                              style: const TextStyle(
+                              style: TextStyle(
                                   fontSize: 17,
                                   fontWeight: FontWeight.w900,
-                                  color: Color(0xFF0F172A))),
+                                  color: tx(Color(0xFF0F172A)))),
                       const SizedBox(height: 2),
                       Text(descricao ?? categoria.descricao,
-                          style: const TextStyle(
-                              fontSize: 13, color: Color(0xFF64748B))),
+                          style: TextStyle(
+                              fontSize: 13, color: fr(Color(0xFF64748B)))),
                     ],
                   ),
                 ),

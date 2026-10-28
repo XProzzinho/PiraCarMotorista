@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'cores.dart';
 
 /// Exclui a conta do usuário logado:
 /// 1) confirma a identidade (senha ou Google),
@@ -47,8 +48,8 @@ Future<void> excluirConta(BuildContext context,
             ),
           ] else ...[
             const SizedBox(height: 10),
-            const Text('Você vai confirmar com a sua conta do Google.',
-                style: TextStyle(color: Colors.black54)),
+            Text('Você vai confirmar com a sua conta do Google.',
+                style: TextStyle(color: fr(Colors.black54))),
           ],
         ],
       ),

@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'cores.dart';
 
 // ---------- Regras dos tokens ----------
 
@@ -264,7 +265,7 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF4F6FA),
+      backgroundColor: fu(Color(0xFFF4F6FA)),
       appBar: AppBar(
         title: const Text('Recarregar saldo'),
         centerTitle: true,
@@ -321,7 +322,7 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
       ),
       child: Row(
         children: [
-          const CircleAvatar(
+          CircleAvatar(
             radius: 26,
             backgroundColor: _amarelo,
             child: Icon(Icons.account_balance_wallet,
@@ -365,7 +366,7 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
           padding: const EdgeInsets.symmetric(vertical: 3),
           child: Row(
             children: [
-              Icon(i, size: 18, color: Colors.black54),
+              Icon(i, size: 18, color: fr(Colors.black54)),
               const SizedBox(width: 8),
               Expanded(child: Text(t, style: const TextStyle(fontSize: 13.5))),
             ],
@@ -374,7 +375,7 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: sup(Colors.white),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -398,10 +399,10 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: sup(Colors.white),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-              color: sel ? _azulNoite : const Color(0xFFE2E8F0),
+              color: sel ? _azulNoite : ln(Color(0xFFE2E8F0)),
               width: sel ? 2.5 : 1.5),
         ),
         child: Column(
@@ -412,7 +413,7 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
                 style: const TextStyle(
                     fontSize: 20, fontWeight: FontWeight.w800, color: _verde)),
             Text('${v * 100 ~/ custoPositivo} corridas',
-                style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                style: TextStyle(fontSize: 12, color: fr(Colors.black54))),
           ],
         ),
       ),
@@ -423,7 +424,7 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: sup(Colors.white),
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
@@ -436,20 +437,20 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
-              color: const Color(0xFFF4F6FA),
+              color: fu(Color(0xFFF4F6FA)),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Row(
               children: [
-                const Icon(Icons.qr_code_2, color: Colors.black54),
+                Icon(Icons.qr_code_2, color: fr(Colors.black54)),
                 const SizedBox(width: 10),
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text('Chave Pix (telefone)',
                           style:
-                              TextStyle(fontSize: 12, color: Colors.black54)),
+                              TextStyle(fontSize: 12, color: fr(Colors.black54))),
                       Text(chavePixTexto,
                           style: TextStyle(
                               fontSize: 17, fontWeight: FontWeight.w700)),
@@ -465,10 +466,10 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
             ),
           ),
           const SizedBox(height: 8),
-          const Text(
+          Text(
             'Depois de pagar, toque em "Já fiz o Pix". O saldo entra '
             'assim que o pagamento for conferido.',
-            style: TextStyle(fontSize: 13, color: Colors.black54),
+            style: TextStyle(fontSize: 13, color: fr(Colors.black54)),
           ),
           const SizedBox(height: 12),
           SizedBox(
@@ -497,7 +498,7 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: sup(Colors.white),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.orange.shade300, width: 1.5),
       ),
@@ -516,9 +517,9 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
           Text(v is num
               ? 'Recarga de ${reais((v * 100).round())}.'
               : 'Recarga pedida.'),
-          const Text(
+          Text(
               'Assim que o Pix for conferido, o valor entra no seu saldo.',
-              style: TextStyle(color: Colors.black54)),
+              style: TextStyle(color: fr(Colors.black54))),
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,

@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'cores.dart';
 
 /// Faixa com o aviso que o admin publica (config/avisos -> [tipo]).
 /// Depois que a pessoa fecha no X, só volta quando chegar um aviso novo.
@@ -66,7 +67,7 @@ class _Faixa extends StatelessWidget {
               padding: const EdgeInsets.all(7),
               decoration: const BoxDecoration(
                   color: Color(0xFFFFC24B), shape: BoxShape.circle),
-              child: const Icon(Icons.campaign,
+              child: Icon(Icons.campaign,
                   size: 20, color: Color(0xFF0B2545)),
             ),
             const SizedBox(width: 10),

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'tokens.dart';
+import 'cores.dart';
 
 const _azulNoite = Color(0xFF0B2545);
 const _azul = Color(0xFF1E88E5);
@@ -344,7 +345,7 @@ class _Mini extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: alerta ? const Color(0xFFFFF3E0) : const Color(0xFFF3F4F6),
+      color: alerta ? ta(Color(0xFFFFF3E0)) : const Color(0xFFF3F4F6),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -470,8 +471,8 @@ class _DeslizarOnlineState extends State<DeslizarOnline>
                 child: Container(
                   width: _bola,
                   height: _bola,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: sup(Colors.white),
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(color: Color(0x33000000), blurRadius: 6)

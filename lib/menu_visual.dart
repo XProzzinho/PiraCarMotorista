@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'cores.dart';
 
 /// Peças do menu lateral (três tracinhos), iguais nos três apps PiraCar.
 
@@ -27,7 +28,7 @@ class GavetaPiraCar extends StatelessWidget {
     final p = MediaQuery.paddingOf(context);
     return Drawer(
       width: 310,
-      backgroundColor: Colors.white,
+      backgroundColor: sup(Colors.white),
       shape: const RoundedRectangleBorder(),
       child: ListView(
         padding: EdgeInsets.fromLTRB(18, p.top + 28, 18, p.bottom + 16),
@@ -92,7 +93,7 @@ class CabecalhoMenu extends StatelessWidget {
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 3),
                     ),
-                    child: const Icon(Icons.edit, size: 14, color: corMenuTitulo),
+                    child: Icon(Icons.edit, size: 14, color: tx(corMenuTitulo)),
                   ),
                 ),
             ],
@@ -112,10 +113,10 @@ class CabecalhoMenu extends StatelessWidget {
                 ]),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.w900,
-                    color: corMenuTitulo),
+                    color: tx(corMenuTitulo)),
               ),
               if (subtitulo != null && subtitulo!.trim().isNotEmpty) ...[
                 const SizedBox(height: 4),
@@ -182,10 +183,10 @@ class ItemMenu extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text('$contador',
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 13,
                               fontWeight: FontWeight.w800,
-                              color: corMenuTitulo)),
+                              color: tx(corMenuTitulo))),
                     ),
                 ],
               ),
@@ -226,7 +227,7 @@ class LinhaDado extends StatelessWidget {
       decoration: BoxDecoration(
         border: ultima
             ? null
-            : const Border(bottom: BorderSide(color: Color(0xFFEEF0F3))),
+            : Border(bottom: BorderSide(color: ln(Color(0xFFEEF0F3)))),
       ),
       child: Row(
         children: [
@@ -239,7 +240,7 @@ class LinhaDado extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: vazio ? const Color(0xFF94A3B8) : corMenuTitulo)),
+                    color: vazio ? fr(Color(0xFF94A3B8)) : tx(corMenuTitulo))),
           ),
         ],
       ),
@@ -258,7 +259,7 @@ class CartaoDados extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: sup(Colors.white),
         borderRadius: BorderRadius.circular(18),
       ),
       child: Column(children: linhas),
@@ -297,10 +298,10 @@ class FotoEditavel extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: corMenuAmarelo,
                     shape: BoxShape.circle,
-                    border: Border.all(color: const Color(0xFFF4F6FA), width: 3),
+                    border: Border.all(color: ln(Color(0xFFF4F6FA)), width: 3),
                   ),
-                  child: const Icon(Icons.photo_camera_outlined,
-                      size: 17, color: corMenuTitulo),
+                  child: Icon(Icons.photo_camera_outlined,
+                      size: 17, color: tx(corMenuTitulo)),
                 ),
               ),
             ],
