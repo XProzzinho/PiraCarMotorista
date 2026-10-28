@@ -92,7 +92,11 @@ Future<void> excluirConta(BuildContext context,
   final db = FirebaseFirestore.instance;
   try {
     for (final c in colecoesExtras) {
-      await db.collection(c).doc(user.uid).delete();
+      try {
+        await db.collection(c).doc(user.uid).delete();
+      } catch (_) {
+        // documento extra que não existe ou sem permissão: segue
+      }
     }
     await db.collection('users').doc(user.uid).delete();
   } catch (e) {
