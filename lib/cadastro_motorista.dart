@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -7,6 +8,7 @@ import 'package:flutter/services.dart';
 
 import 'cadastro_etapas.dart';
 import 'cadastro_veiculo.dart';
+import 'categorias.dart';
 
 /// Cadastro do motorista em etapas:
 /// 1 Dados pessoais, 2 CNH, 3 Carro, 4 Foto de perfil, 5 E-mail e senha.
@@ -24,6 +26,27 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
   int _etapa = 1;
   bool _carregando = false;
   bool _verSenha = false;
+
+  // categoria extra do carro ('sedan' ou 'conforto'); null = só PiraCar
+  String? _extra;
+  bool _ehMoto = false;
+  bool _motoAtiva = false;
+  StreamSubscription<bool>? _subMoto;
+
+  List<String> get _categorias =>
+      _ehMoto ? const ['moto'] : ['piracar', if (_extra != null) _extra!];
+
+  @override
+  void initState() {
+    super.initState();
+    _subMoto = motoAtiva().listen((v) {
+      if (!mounted) return;
+      setState(() {
+        _motoAtiva = v;
+        if (!v) _ehMoto = false;
+      });
+    });
+  }
 
   final _nome = TextEditingController();
   final _cpf = TextEditingController();
@@ -46,6 +69,7 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
 
   @override
   void dispose() {
+    _subMoto?.cancel();
     for (final c in [
       _nome, _cpf, _rg, _nascimento, _telefone, _cnhNumero, _cnhValidade,
       _modelo, _cor, _ano, _placa, _email, _senha, _senha2,
@@ -175,6 +199,7 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
         'foto': base64Encode(_selfie!),
         'temCnh': true,
         'temFotoCarro': temFotoCarro,
+        'categorias': _categorias,
         'role': 'motorista',
         'aprovado': false,
         'criadoEm': FieldValue.serverTimestamp(),
@@ -358,8 +383,47 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
             maiusculas: TextCapitalization.characters,
             formatos: [LengthLimitingTextInputFormatter(8)],
           ),
+          const SizedBox(height: 6),
+          const Text('Em quais categorias você roda?',
+              style: TextStyle(
+                  fontSize: 17, fontWeight: FontWeight.w800, color: corTexto)),
+          const SizedBox(height: 4),
+          const Text(
+              'O PiraCar já vem marcado. Se o seu carro for sedan ou '
+              'confortável, marque mais uma (é opcional).',
+              style: TextStyle(fontSize: 14, color: corTextoSuave)),
+          const SizedBox(height: 12),
+          CartaoCategoria(
+            categoria: catPiracar,
+            selecionado: !_ehMoto,
+            descricao: 'Sempre ativa para carros',
+            onTap: _ehMoto ? () => setState(() => _ehMoto = false) : null,
+            direita: _marca(!_ehMoto, quadrada: true),
+          ),
+          for (final c in [catSedan, catConforto])
+            CartaoCategoria(
+              categoria: c,
+              selecionado: !_ehMoto && _extra == c.id,
+              descricao: c.id == 'sedan'
+                  ? 'Carro com porta-malas'
+                  : 'Carro novo, SUV ou mais espaçoso',
+              onTap: () => setState(() {
+                _ehMoto = false;
+                _extra = _extra == c.id ? null : c.id;
+              }),
+              direita: _marca(!_ehMoto && _extra == c.id),
+            ),
+          if (_motoAtiva)
+            CartaoCategoria(
+              categoria: catMoto,
+              selecionado: _ehMoto,
+              descricao: 'Rodo de moto (no lugar do carro)',
+              onTap: () => setState(() => _ehMoto = !_ehMoto),
+              direita: _marca(_ehMoto),
+            ),
+          const SizedBox(height: 8),
           QuadroFoto(
-            titulo: 'Foto do carro',
+            titulo: _ehMoto ? 'Foto da moto' : 'Foto do carro',
             dica: 'De lado, com a placa aparecendo (opcional)',
             foto: _fotoCarro,
             altura: 130,
@@ -454,4 +518,29 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
           ),
         ],
       );
+
+  Widget _marca(bool marcado, {bool quadrada = false}) {
+    return Container(
+      width: 26,
+      height: 26,
+      decoration: BoxDecoration(
+        color: marcado && quadrada ? corAzul : null,
+        borderRadius: BorderRadius.circular(quadrada ? 8 : 13),
+        border: Border.all(
+            color: marcado ? corAzul : const Color(0xFFCBD5E1), width: 2),
+      ),
+      child: marcado
+          ? (quadrada
+              ? const Icon(Icons.check, size: 16, color: Colors.white)
+              : Center(
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: const BoxDecoration(
+                        color: corAzul, shape: BoxShape.circle),
+                  ),
+                ))
+          : null,
+    );
+  }
 }
