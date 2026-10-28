@@ -1,8 +1,8 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+
+import 'foto_trocar.dart';
 
 /// Peças visuais do cadastro em etapas (mesmo visual da tela de entrada).
 
@@ -506,33 +506,7 @@ Future<Uint8List?> escolherFoto(
   int qualidade = 60,
   int limiteKb = 600,
 }) async {
-  final origem = await showModalBottomSheet<ImageSource>(
-    context: context,
-    builder: (c) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Text(titulo,
-                style:
-                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_camera_outlined),
-            title: const Text('Tirar foto agora'),
-            onTap: () => Navigator.pop(c, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('Escolher da galeria'),
-            onTap: () => Navigator.pop(c, ImageSource.gallery),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    ),
-  );
+  final origem = await escolherOrigemFoto(context, titulo);
   if (origem == null) return null;
 
   final picker = ImagePicker();

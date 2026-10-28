@@ -4,7 +4,8 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
+
+import 'cadastro_etapas.dart';
 
 const _azul = Color(0xFF1565C0);
 const _campoFundo = Color(0xFFF4F6FA);
@@ -31,57 +32,6 @@ bool cpfValido(String cpf) {
 String? erroDocumentos(String cpf, String rg) {
   if (!cpfValido(cpf)) return 'CPF inválido. Confira os números.';
   if (rg.trim().length < 5) return 'Digite o número do seu RG.';
-  return null;
-}
-
-// Limite de tamanho da foto (o Firestore aceita até 1 MB por documento).
-const _limiteBytes = 700 * 1024;
-
-/// Abre a câmera ou a galeria e devolve a foto da CNH já reduzida.
-Future<Uint8List?> escolherFotoCnh(BuildContext context) async {
-  final origem = await showModalBottomSheet<ImageSource>(
-    context: context,
-    builder: (c) => SafeArea(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Foto da CNH',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_camera_outlined),
-            title: const Text('Tirar foto agora'),
-            onTap: () => Navigator.pop(c, ImageSource.camera),
-          ),
-          ListTile(
-            leading: const Icon(Icons.photo_library_outlined),
-            title: const Text('Escolher da galeria'),
-            onTap: () => Navigator.pop(c, ImageSource.gallery),
-          ),
-          const SizedBox(height: 8),
-        ],
-      ),
-    ),
-  );
-  if (origem == null) return null;
-
-  final picker = ImagePicker();
-  for (final (largura, qualidade) in [(1280.0, 60), (1000.0, 45), (800.0, 35)]) {
-    final foto = await picker.pickImage(
-      source: origem,
-      maxWidth: largura,
-      maxHeight: largura,
-      imageQuality: qualidade,
-    );
-    if (foto == null) return null;
-    final bytes = await foto.readAsBytes();
-    if (bytes.length <= _limiteBytes) return bytes;
-    if (!context.mounted) return null;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Foto muito grande, escolha de novo para reduzir.')));
-  }
   return null;
 }
 
@@ -150,7 +100,7 @@ class CampoFotoCnh extends StatelessWidget {
   }
 }
 
-InputDecoration decoracaoCampo(String dica, IconData icone) {
+InputDecoration decoracaoCampo(String dica, IconData icone, {Widget? sufixo}) {
   final borda = OutlineInputBorder(
     borderRadius: BorderRadius.circular(14),
     borderSide: const BorderSide(color: _campoBorda, width: 1.5),
@@ -159,6 +109,7 @@ InputDecoration decoracaoCampo(String dica, IconData icone) {
     hintText: dica,
     hintStyle: const TextStyle(color: Color(0xFF8A94A6)),
     prefixIcon: Icon(icone, color: const Color(0xFF64748B), size: 20),
+    suffixIcon: sufixo,
     filled: true,
     fillColor: _campoFundo,
     contentPadding: const EdgeInsets.symmetric(vertical: 16),
@@ -169,14 +120,17 @@ InputDecoration decoracaoCampo(String dica, IconData icone) {
   );
 }
 
-Widget rotuloCampo(String texto) => Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Text(texto,
-          style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w600,
-              color: Color(0xFF334155))),
-    );
+Widget rotuloCampo(String texto, {Widget? acao}) {
+  final rotulo = Text(texto,
+      style: const TextStyle(
+          fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)));
+  return Padding(
+    padding: const EdgeInsets.only(bottom: 6),
+    child: acao == null
+        ? rotulo
+        : Row(children: [rotulo, const Spacer(), acao]),
+  );
+}
 
 /// Tela para o motorista completar os dados do carro e enviar a CNH
 /// (aparece para quem se cadastrou antes ou entrou com o Google).
@@ -223,7 +177,9 @@ class _CompletarCadastroPageState extends State<CompletarCadastroPage> {
   }
 
   Future<void> _escolherCnh() async {
-    final foto = await escolherFotoCnh(context);
+    // até 700 KB: o Firestore aceita até 1 MB por documento
+    final foto =
+        await escolherFoto(context, titulo: 'Foto da CNH', limiteKb: 700);
     if (foto != null && mounted) setState(() => _cnh = foto);
   }
 

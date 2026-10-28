@@ -28,6 +28,10 @@ int custoCorrida(int saldo) => saldo > 0 ? custoPositivo : custoNegativo;
 /// Ainda dá para aceitar mais uma corrida sem passar de -R$ 10,00?
 bool podeRodar(int saldo) => saldo - custoCorrida(saldo) >= limiteNegativo;
 
+/// Valor em reais: 16.4 -> "R$ 16,40".
+String real(num v) =>
+    'R\$ ${v.toDouble().toStringAsFixed(2).replaceAll('.', ',')}';
+
 /// Formata centavos como dinheiro: 750 -> "R$ 7,50", -300 -> "-R$ 3,00".
 String reais(int centavos) {
   final s = (centavos.abs() / 100).toStringAsFixed(2).replaceAll('.', ',');

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cadastro_motorista.dart';
+import 'cadastro_veiculo.dart';
 import 'creditos.dart';
 
 const _azulNoite = Color(0xFF0B2545);
@@ -13,7 +14,6 @@ const _azul = Color(0xFF1565C0);
 const _amarelo = Color(0xFFFFC24B);
 const _texto = Color(0xFF0F172A);
 const _textoSuave = Color(0xFF5B6577);
-const _campoFundo = Color(0xFFF4F6FA);
 const _campoBorda = Color(0xFFE2E8F0);
 
 class LoginPage extends StatefulWidget {
@@ -98,43 +98,6 @@ class _LoginPageState extends State<LoginPage> {
     }
   }
 
-  InputDecoration _decoracao(String dica, IconData icone, {Widget? sufixo}) {
-    final borda = OutlineInputBorder(
-      borderRadius: BorderRadius.circular(14),
-      borderSide: const BorderSide(color: _campoBorda, width: 1.5),
-    );
-    return InputDecoration(
-      hintText: dica,
-      hintStyle: const TextStyle(color: Color(0xFF8A94A6)),
-      prefixIcon: Icon(icone, color: const Color(0xFF64748B), size: 20),
-      suffixIcon: sufixo,
-      filled: true,
-      fillColor: _campoFundo,
-      contentPadding: const EdgeInsets.symmetric(vertical: 16),
-      enabledBorder: borda,
-      border: borda,
-      focusedBorder: borda.copyWith(
-          borderSide: const BorderSide(color: _azul, width: 1.5)),
-    );
-  }
-
-  Widget _rotulo(String texto, {Widget? acao}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: Row(
-        children: [
-          Text(texto,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFF334155))),
-          const Spacer(),
-          if (acao != null) acao,
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final topo = MediaQuery.paddingOf(context).top;
@@ -210,15 +173,15 @@ class _LoginPageState extends State<LoginPage> {
         const Text('Entre para começar a receber corridas.',
             style: TextStyle(fontSize: 15, color: _textoSuave)),
         const SizedBox(height: 20),
-        _rotulo('E-mail'),
+        rotuloCampo('E-mail'),
         TextField(
           controller: _email,
           keyboardType: TextInputType.emailAddress,
           autofillHints: const [AutofillHints.email],
-          decoration: _decoracao('voce@email.com', Icons.mail_outline),
+          decoration: decoracaoCampo('voce@email.com', Icons.mail_outline),
         ),
         const SizedBox(height: 16),
-        _rotulo(
+        rotuloCampo(
           'Senha',
           acao: GestureDetector(
             onTap: _esqueciSenha,
@@ -232,7 +195,7 @@ class _LoginPageState extends State<LoginPage> {
           obscureText: !_mostrarSenha,
           autofillHints: const [AutofillHints.password],
           onSubmitted: (_) => _carregando ? null : _enviar(),
-          decoration: _decoracao(
+          decoration: decoracaoCampo(
             'Sua senha',
             Icons.lock_outline,
             sufixo: IconButton(
