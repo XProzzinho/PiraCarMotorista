@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'cores.dart';
 
 /// Chat entre motorista e passageiro durante a corrida.
 ///
@@ -208,7 +209,7 @@ class _ChatCorridaPageState extends State<ChatCorridaPage> {
   Widget build(BuildContext context) {
     final papel = widget.souMotorista ? 'Seu passageiro' : 'Seu motorista';
     return Scaffold(
-      backgroundColor: _fundo,
+      backgroundColor: fu(_fundo),
       appBar: AppBar(
         backgroundColor: _azulNoite,
         foregroundColor: Colors.white,
@@ -217,7 +218,7 @@ class _ChatCorridaPageState extends State<ChatCorridaPage> {
           children: [
             CircleAvatar(
               radius: 18,
-              backgroundColor: const Color(0xFFE8F1FD),
+              backgroundColor: ta(Color(0xFFE8F1FD)),
               child: Icon(
                   widget.souMotorista
                       ? Icons.person_outline
@@ -283,8 +284,8 @@ class _ChatCorridaPageState extends State<ChatCorridaPage> {
                             ? 'O chat fecha quando a corrida terminar.'
                             : 'Corrida encerrada. O chat está fechado.',
                         textAlign: TextAlign.center,
-                        style: const TextStyle(
-                            fontSize: 12, color: Colors.black54),
+                        style: TextStyle(
+                            fontSize: 12, color: fr(Colors.black54)),
                       ),
                     ),
                     for (final m in msgs) _balao(m),
@@ -303,7 +304,7 @@ class _ChatCorridaPageState extends State<ChatCorridaPage> {
                           padding: const EdgeInsets.only(right: 6),
                           child: ActionChip(
                             label: Text(r),
-                            backgroundColor: Colors.white,
+                            backgroundColor: sup(Colors.white),
                             onPressed: _enviando ? null : () => _enviar(r),
                           ),
                         ),
@@ -328,7 +329,7 @@ class _ChatCorridaPageState extends State<ChatCorridaPage> {
                               hintText: 'Escreva uma mensagem',
                               counterText: '',
                               filled: true,
-                              fillColor: Colors.white,
+                              fillColor: sup(Colors.white),
                               contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 16, vertical: 12),
                               border: OutlineInputBorder(
@@ -388,12 +389,12 @@ class _ChatCorridaPageState extends State<ChatCorridaPage> {
             Text((m['texto'] ?? '').toString(),
                 style: TextStyle(
                     fontSize: 15,
-                    color: meu ? Colors.white : Colors.black87)),
+                    color: meu ? Colors.white : tx(Colors.black87))),
             const SizedBox(height: 2),
             Text(_hora(m['em']),
                 style: TextStyle(
                     fontSize: 11,
-                    color: meu ? Colors.white60 : Colors.black45)),
+                    color: meu ? Colors.white60 : fr(Colors.black45))),
           ],
         ),
       ),

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import 'home_page.dart';
 import 'login_page.dart';
+import 'cores.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -16,13 +17,11 @@ class PiraCarMotoristaApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
+    return ObservadorTema(
+      builder: (context) => MaterialApp(
       title: 'PiraCar Motorista',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF1E88E5),
-        useMaterial3: true,
-      ),
+      theme: temaPiraCar(const Color(0xFF1E88E5)),
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snap) {
@@ -32,6 +31,7 @@ class PiraCarMotoristaApp extends StatelessWidget {
           }
           return snap.hasData ? const HomePage() : const LoginPage();
         },
+      ),
       ),
     );
   }

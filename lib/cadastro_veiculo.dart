@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import 'cadastro_etapas.dart';
+import 'cores.dart';
 
 const _azul = Color(0xFF1565C0);
 const _campoFundo = Color(0xFFF4F6FA);
@@ -66,13 +67,13 @@ class CampoFotoCnh extends StatelessWidget {
         ),
         clipBehavior: Clip.antiAlias,
         child: foto == null
-            ? const Column(
+            ? Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.badge_outlined, size: 36, color: Color(0xFF64748B)),
+                  Icon(Icons.badge_outlined, size: 36, color: fr(Color(0xFF64748B))),
                   SizedBox(height: 6),
                   Text('Toque para enviar a foto da CNH',
-                      style: TextStyle(color: Color(0xFF5B6577))),
+                      style: TextStyle(color: fr(Color(0xFF5B6577)))),
                 ],
               )
             : Stack(
@@ -107,8 +108,8 @@ InputDecoration decoracaoCampo(String dica, IconData icone, {Widget? sufixo}) {
   );
   return InputDecoration(
     hintText: dica,
-    hintStyle: const TextStyle(color: Color(0xFF8A94A6)),
-    prefixIcon: Icon(icone, color: const Color(0xFF64748B), size: 20),
+    hintStyle: TextStyle(color: fr(Color(0xFF8A94A6))),
+    prefixIcon: Icon(icone, color: fr(Color(0xFF64748B)), size: 20),
     suffixIcon: sufixo,
     filled: true,
     fillColor: _campoFundo,
@@ -122,8 +123,8 @@ InputDecoration decoracaoCampo(String dica, IconData icone, {Widget? sufixo}) {
 
 Widget rotuloCampo(String texto, {Widget? acao}) {
   final rotulo = Text(texto,
-      style: const TextStyle(
-          fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF334155)));
+      style: TextStyle(
+          fontSize: 13, fontWeight: FontWeight.w600, color: tx(Color(0xFF334155))));
   return Padding(
     padding: const EdgeInsets.only(bottom: 6),
     child: acao == null
@@ -236,10 +237,10 @@ class _CompletarCadastroPageState extends State<CompletarCadastroPage> {
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            const Text(
+            Text(
               'Precisamos dos seus documentos, dos dados do carro e da foto '
               'da CNH para liberar as corridas.',
-              style: TextStyle(fontSize: 15, color: Color(0xFF5B6577)),
+              style: TextStyle(fontSize: 15, color: fr(Color(0xFF5B6577))),
             ),
             const SizedBox(height: 20),
             rotuloCampo('Nome'),

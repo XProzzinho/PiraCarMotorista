@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import 'foto_trocar.dart';
+import 'cores.dart';
 
 /// Peças visuais do cadastro em etapas (mesmo visual da tela de entrada).
 
@@ -169,8 +170,8 @@ class EtapaCadastro extends StatelessWidget {
             Expanded(
               child: Container(
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  color: Colors.white,
+                decoration: BoxDecoration(
+                  color: sup(Colors.white),
                   borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
                 ),
                 child: SafeArea(
@@ -290,7 +291,7 @@ class CampoCadastro extends StatelessWidget {
             style: const TextStyle(fontSize: 16, color: corTexto),
             decoration: InputDecoration(
               hintText: dica,
-              hintStyle: const TextStyle(color: Color(0xFF94A3B8)),
+              hintStyle: TextStyle(color: fr(Color(0xFF94A3B8))),
               prefixIcon: Icon(icone, color: corTextoSuave, size: 20),
               suffixIcon: sufixo,
               filled: true,
@@ -360,7 +361,7 @@ class QuadroFoto extends StatelessWidget {
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(22),
               border: Border.all(
-                  color: foto == null ? const Color(0xFFCBD5E1) : corAzul,
+                  color: foto == null ? ln(Color(0xFFCBD5E1)) : corAzul,
                   width: 2),
             ),
             child: foto != null
@@ -439,7 +440,7 @@ class CirculoFoto extends StatelessWidget {
                 color: corCampoFundo,
                 shape: BoxShape.circle,
                 border: Border.all(
-                    color: foto == null ? const Color(0xFFCBD5E1) : corAzul,
+                    color: foto == null ? ln(Color(0xFFCBD5E1)) : corAzul,
                     width: 3),
                 image: foto == null
                     ? null

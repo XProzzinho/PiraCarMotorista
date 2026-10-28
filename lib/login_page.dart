@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'cadastro_motorista.dart';
 import 'cadastro_veiculo.dart';
 import 'creditos.dart';
+import 'cores.dart';
 
 const _azulNoite = Color(0xFF0B2545);
 const _azul = Color(0xFF1565C0);
@@ -132,8 +133,8 @@ class _LoginPageState extends State<LoginPage> {
                   constraints: BoxConstraints(
                       minHeight: math.max(0.0, c.maxHeight - alturaHero)),
                   padding: const EdgeInsets.fromLTRB(24, 14, 24, 24),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
+                  decoration: BoxDecoration(
+                    color: sup(Colors.white),
                     borderRadius:
                         BorderRadius.vertical(top: Radius.circular(30)),
                   ),
@@ -204,7 +205,7 @@ class _LoginPageState extends State<LoginPage> {
                   _mostrarSenha
                       ? Icons.visibility_off_outlined
                       : Icons.visibility_outlined,
-                  color: const Color(0xFF64748B),
+                  color: fr(Color(0xFF64748B)),
                   size: 20),
               onPressed: () => setState(() => _mostrarSenha = !_mostrarSenha),
             ),
