@@ -77,7 +77,7 @@ class _Faixa extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('Aviso PiraCar',
+                    const Text('Aviso Uai Car',
                         style: TextStyle(
                             color: Color(0xFFFFC24B),
                             fontSize: 12,

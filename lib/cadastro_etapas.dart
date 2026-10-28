@@ -103,7 +103,7 @@ class EtapaCadastro extends StatelessWidget {
                             const Text.rich(
                               TextSpan(children: [
                                 TextSpan(
-                                    text: 'Pira',
+                                    text: 'Uai ',
                                     style: TextStyle(color: Colors.white)),
                                 TextSpan(
                                     text: 'Car',

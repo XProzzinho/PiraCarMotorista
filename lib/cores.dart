@@ -1,14 +1,47 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// Modo escuro do PiraCar: segue a configuração do celular.
+/// Modo escuro: Automático (segue o celular), Claro ou Escuro.
 ///
 /// As funções abaixo recebem a cor do modo claro e devolvem a cor certa
 /// para o modo atual. No modo claro devolvem a própria cor (o visual não
 /// muda); no escuro trocam por tons escuros.
 /// Este arquivo é igual nos três apps.
 
+/// Escolha da pessoa: 'auto' (segue o celular), 'claro' ou 'escuro'.
+String escolhaTema = 'auto';
+
+bool _calcular() => escolhaTema == 'claro'
+    ? false
+    : (escolhaTema == 'escuro' ? true : _celularEscuro());
+
 final modoEscuro = ValueNotifier<bool>(_celularEscuro());
+
+/// Lê a escolha salva no celular. Chame no main(), antes do runApp.
+Future<void> carregarTema() async {
+  try {
+    final p = await SharedPreferences.getInstance();
+    escolhaTema = p.getString('tema') ?? 'auto';
+  } catch (_) {}
+  modoEscuro.value = _calcular();
+}
+
+/// Troca a aparência e guarda a escolha.
+Future<void> mudarTema(String escolha) async {
+  escolhaTema = escolha;
+  modoEscuro.value = _calcular();
+  try {
+    final p = await SharedPreferences.getInstance();
+    await p.setString('tema', escolha);
+  } catch (_) {}
+}
+
+const nomesTema = {
+  'auto': 'Automático',
+  'claro': 'Claro',
+  'escuro': 'Escuro',
+};
 
 bool _celularEscuro() =>
     SchedulerBinding.instance.platformDispatcher.platformBrightness ==
@@ -18,7 +51,7 @@ bool _celularEscuro() =>
 bool get escuro => modoEscuro.value;
 
 /// Chamado quando o celular troca entre claro e escuro.
-void atualizarModoEscuro() => modoEscuro.value = _celularEscuro();
+void atualizarModoEscuro() => modoEscuro.value = _calcular();
 
 const _fundoEscuro = Color(0xFF0E1420);
 const _cartaoEscuro = Color(0xFF1A2232);
@@ -111,4 +144,27 @@ class _ObservadorTemaState extends State<ObservadorTema>
           KeyedSubtree(key: ValueKey(valor), child: widget.builder(context)),
     );
   }
+}
+
+/// Janela para escolher a aparência.
+Future<void> escolherAparencia(BuildContext context) async {
+  final nova = await showDialog<String>(
+    context: context,
+    builder: (c) => SimpleDialog(
+      title: const Text('Aparência'),
+      children: [
+        for (final e in nomesTema.entries)
+          RadioListTile<String>(
+            value: e.key,
+            groupValue: escolhaTema,
+            title: Text(e.value),
+            subtitle: e.key == 'auto'
+                ? const Text('Segue o modo do celular')
+                : null,
+            onChanged: (v) => Navigator.pop(c, v),
+          ),
+      ],
+    ),
+  );
+  if (nova != null && nova != escolhaTema) await mudarTema(nova);
 }

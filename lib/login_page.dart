@@ -294,7 +294,7 @@ class _Marca extends StatelessWidget {
             const Text.rich(
               TextSpan(
                 children: [
-                  TextSpan(text: 'Pira', style: TextStyle(color: Colors.white)),
+                  TextSpan(text: 'Uai ', style: TextStyle(color: Colors.white)),
                   TextSpan(text: 'Car', style: TextStyle(color: _amarelo)),
                 ],
               ),
@@ -322,7 +322,7 @@ class _Marca extends StatelessWidget {
         const SizedBox(
           width: 260,
           child: Text(
-            'Dirija com a PiraCar e ganhe no seu ritmo.',
+            'Dirija com a Uai Car e ganhe no seu ritmo.',
             style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w500,

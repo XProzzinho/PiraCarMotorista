@@ -37,6 +37,15 @@ class GavetaPiraCar extends StatelessWidget {
           cabecalho,
           const SizedBox(height: 22),
           ...itens,
+          ItemMenu(
+            escuro ? Icons.dark_mode_outlined : Icons.light_mode_outlined,
+            'Aparência: ${nomesTema[escolhaTema]}',
+            () {
+              final raiz = Navigator.of(context).context;
+              Navigator.pop(context);
+              escolherAparencia(raiz);
+            },
+          ),
           if (rodape) ...[
             const SizedBox(height: 28),
             const Center(

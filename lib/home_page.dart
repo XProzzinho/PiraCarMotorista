@@ -422,7 +422,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
               accuracy: LocationAccuracy.high,
               distanceFilter: 4,
               foregroundNotificationConfig: const ForegroundNotificationConfig(
-                notificationTitle: 'PiraCar: você está online',
+                notificationTitle: 'Uai Car: você está online',
                 notificationText:
                     'Recebendo corridas mesmo com o app minimizado.',
                 enableWakeLock: true,
@@ -2065,7 +2065,7 @@ class _Bloqueado extends StatelessWidget {
                       ? motivo
                       : 'Enquanto estiver bloqueado, você não pode ficar '
                           'online nem receber corridas. Fale com a '
-                          'administração do PiraCar.',
+                          'administração do Uai Car.',
                   textAlign: TextAlign.center,
                   style: const TextStyle(
                       color: Color(0xFFC9D6EA), fontSize: 15, height: 1.4),

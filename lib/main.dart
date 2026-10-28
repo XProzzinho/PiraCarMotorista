@@ -10,6 +10,7 @@ import 'cores.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
+  await carregarTema();
   runApp(const PiraCarMotoristaApp());
 }
 
@@ -20,7 +21,7 @@ class PiraCarMotoristaApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ObservadorTema(
       builder: (context) => MaterialApp(
-      title: 'PiraCar Motorista',
+      title: 'Uai Car Motorista',
       debugShowCheckedModeBanner: false,
       theme: temaPiraCar(const Color(0xFF1E88E5)),
       home: StreamBuilder<User?>(
