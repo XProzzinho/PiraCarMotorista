@@ -160,22 +160,20 @@ Rota rotaEstimada(LatLng origem, LatLng destino) {
 List<LatLng> _decodificar(String s) {
   final pontos = <LatLng>[];
   int i = 0, lat = 0, lng = 0;
-  while (i < s.length) {
+  // lê o próximo número da polyline do Google
+  int proximo() {
     int b, shift = 0, res = 0;
     do {
       b = s.codeUnitAt(i++) - 63;
       res |= (b & 0x1f) << shift;
       shift += 5;
     } while (b >= 0x20);
-    lat += (res & 1) != 0 ? ~(res >> 1) : (res >> 1);
-    shift = 0;
-    res = 0;
-    do {
-      b = s.codeUnitAt(i++) - 63;
-      res |= (b & 0x1f) << shift;
-      shift += 5;
-    } while (b >= 0x20);
-    lng += (res & 1) != 0 ? ~(res >> 1) : (res >> 1);
+    return (res & 1) != 0 ? ~(res >> 1) : (res >> 1);
+  }
+
+  while (i < s.length) {
+    lat += proximo();
+    lng += proximo();
     pontos.add(LatLng(lat / 1e5, lng / 1e5));
   }
   return pontos;

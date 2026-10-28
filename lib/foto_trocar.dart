@@ -5,23 +5,19 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 
-/// Abre câmera ou galeria, reduz a foto e salva no cadastro do usuário.
-Future<void> trocarFotoPerfil(BuildContext context) async {
-  void aviso(String m) {
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
-  }
-
-  final origem = await showModalBottomSheet<ImageSource>(
+/// Pergunta se a foto vem da câmera ou da galeria.
+Future<ImageSource?> escolherOrigemFoto(BuildContext context, String titulo) {
+  return showModalBottomSheet<ImageSource>(
     context: context,
     builder: (c) => SafeArea(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Padding(
-            padding: EdgeInsets.all(16),
-            child: Text('Foto do perfil',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Text(titulo,
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           ),
           ListTile(
             leading: const Icon(Icons.photo_camera_outlined),
@@ -38,6 +34,16 @@ Future<void> trocarFotoPerfil(BuildContext context) async {
       ),
     ),
   );
+}
+
+/// Abre câmera ou galeria, reduz a foto e salva no cadastro do usuário.
+Future<void> trocarFotoPerfil(BuildContext context) async {
+  void aviso(String m) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(m)));
+  }
+
+  final origem = await escolherOrigemFoto(context, 'Foto do perfil');
   if (origem == null) return;
   try {
     final foto = await ImagePicker().pickImage(

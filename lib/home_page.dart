@@ -29,9 +29,6 @@ const _nomesPagamento = {
   'pix': 'Pix',
 };
 
-String _real(num v) =>
-    'R\$ ${v.toDouble().toStringAsFixed(2).replaceAll('.', ',')}';
-
 LatLng? _ll(dynamic gp) =>
     gp is GeoPoint ? LatLng(gp.latitude, gp.longitude) : null;
 
@@ -765,7 +762,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
       if (status == 'finalizada') {
         final v = d['valor'];
         _encerrar(v is num
-            ? 'Corrida finalizada. Receba ${_real(v)} do passageiro.'
+            ? 'Corrida finalizada. Receba ${real(v)} do passageiro.'
             : 'Corrida finalizada.');
         _avaliarPassageiro(id);
         return;
@@ -1480,7 +1477,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
         ),
         const SizedBox(height: 8),
         if (valor is num)
-          Text(_real(valor),
+          Text(real(valor),
               style: const TextStyle(
                   fontSize: 36,
                   fontWeight: FontWeight.w800,
@@ -1626,7 +1623,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
         Text('Destino: ${c['destinoTexto'] ?? '-'}'),
         if (valor is num)
           Text(
-            'Você recebe: ${_real(valor)}${forma != null ? ' • $forma' : ''}',
+            'Você recebe: ${real(valor)}${forma != null ? ' • $forma' : ''}',
             style: const TextStyle(
                 fontSize: 16, fontWeight: FontWeight.bold, color: _verde),
           ),
