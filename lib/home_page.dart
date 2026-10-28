@@ -62,14 +62,6 @@ Future<BitmapDescriptor> _criarIcone(IconData icone, Color cor,
   return BitmapDescriptor.fromBytes(bytes!.buffer.asUint8List());
 }
 
-// Toca o som de notificação do celular.
-Future<void> _tocarSom() async {
-  try {
-    await const MethodChannel('flutter_ringtone_player')
-        .invokeMethod('play', {'android': 2, 'ios': 1007, 'asAlarm': false});
-  } catch (_) {}
-}
-
 IconData _iconeManobra(String manobra) => switch (manobra) {
       'esquerda' => Icons.turn_left,
       'direita' => Icons.turn_right,
@@ -305,13 +297,12 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     }
   }
 
-  // Fechou o app ou saiu dele: fica offline (menos no meio de uma corrida).
+  // Minimizar o app NÃO deixa offline: ele segue recebendo corridas em
+  // segundo plano (com aviso fixo na barra do celular). Só fechar de vez
+  // o app deixa offline.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if ((state == AppLifecycleState.paused ||
-            state == AppLifecycleState.detached) &&
-        _online &&
-        _corridaId == null) {
+    if (state == AppLifecycleState.detached && _online && _corridaId == null) {
       _alternarOnline();
     }
   }
@@ -362,12 +353,31 @@ class _MapaMotoristaState extends State<_MapaMotorista>
       final p = await Geolocator.getCurrentPosition();
       _novaPosicao(p, centralizar: true);
     } catch (_) {}
+    _ouvirPosicao();
+  }
+
+  // Online: a localização roda como serviço do Android (aviso fixo na
+  // barra), para o app continuar recebendo corridas minimizado.
+  void _ouvirPosicao() {
+    _subPos?.cancel();
+    final emSegundoPlano = _online || _corridaId != null;
     _subPos = Geolocator.getPositionStream(
-      locationSettings: const LocationSettings(
-        accuracy: LocationAccuracy.high,
-        distanceFilter: 4,
-      ),
-    ).listen((p) => _novaPosicao(p));
+      locationSettings: emSegundoPlano
+          ? AndroidSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 4,
+              foregroundNotificationConfig: const ForegroundNotificationConfig(
+                notificationTitle: 'PiraCar: você está online',
+                notificationText:
+                    'Recebendo corridas mesmo com o app minimizado.',
+                enableWakeLock: true,
+              ),
+            )
+          : const LocationSettings(
+              accuracy: LocationAccuracy.high,
+              distanceFilter: 4,
+            ),
+    ).listen((p) => _novaPosicao(p), onError: (_) {});
   }
 
   void _novaPosicao(Position p, {bool centralizar = false}) {
@@ -441,6 +451,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     }
     setState(() => _online = !_online);
     _ligarPresenca(_online && _corridaId == null);
+    _ouvirPosicao();
     if (_online) {
       _primeiraLista = true;
       _vistos.clear();
@@ -657,7 +668,19 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   }
 
   Future<void> _alertar() async {
-    _tocarSom();
+    // a corrida mais nova oferecida a mim
+    Map<String, dynamic>? d;
+    for (final x in _visiveis) {
+      d = x.data();
+    }
+    final valor = d?['valor'];
+    final destino = (d?['destinoTexto'] ?? '').toString();
+    notificarCorrida(
+      valor is num
+          ? 'Nova corrida! R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}'
+          : 'Nova corrida!',
+      destino.isEmpty ? 'Toque para ver e aceitar.' : 'Destino: $destino',
+    );
     HapticFeedback.heavyImpact();
     await Future.delayed(const Duration(milliseconds: 350));
     HapticFeedback.heavyImpact();

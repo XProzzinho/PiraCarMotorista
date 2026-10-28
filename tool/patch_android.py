@@ -11,6 +11,9 @@ perms = (
     '    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>\n'
     '    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>\n'
     '    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>\n'
+    '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>\n'
+    '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>\n'
+    '    <uses-permission android:name="android.permission.WAKE_LOCK"/>\n'
     '    '
 )
 assert "<application" in t, "manifest sem <application>"
@@ -48,4 +51,11 @@ t, n = re.subn(r"compileOptions\s*\{", "compileOptions {\n        coreLibraryDes
 assert n == 1, "compileOptions não encontrado"
 t += '\ndependencies {\n    coreLibraryDesugaring "com.android.tools:desugar_jdk_libs:2.0.4"\n}\n'
 bg.write_text(t)
+# 4) som da corrida em res/raw
+import shutil
+raw = root / "app/src/main/res/raw"
+raw.mkdir(parents=True, exist_ok=True)
+for f in pathlib.Path("android_extra/raw").glob("*"):
+    shutil.copy(f, raw / f.name)
+
 print("Patch Android aplicado com sucesso")

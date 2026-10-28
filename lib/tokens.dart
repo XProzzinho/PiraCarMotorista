@@ -98,6 +98,34 @@ Future<void> notificarSaldo(int saldo) async {
   } catch (_) {}
 }
 
+/// Aviso de corrida nova, com o som do PiraCar (res/raw/corrida.ogg).
+/// Toca também com o app minimizado.
+Future<void> notificarCorrida(String titulo, String texto) async {
+  await iniciarNotificacoes();
+  try {
+    await _notificacoes.show(
+      21,
+      titulo,
+      texto,
+      const NotificationDetails(
+        android: AndroidNotificationDetails(
+          'corridas_piracar',
+          'Corridas',
+          channelDescription: 'Toque de corrida nova',
+          importance: Importance.max,
+          priority: Priority.max,
+          sound: RawResourceAndroidNotificationSound('corrida'),
+          playSound: true,
+          enableVibration: true,
+          category: AndroidNotificationCategory.call,
+          visibility: NotificationVisibility.public,
+          ticker: 'Nova corrida',
+        ),
+      ),
+    );
+  } catch (_) {}
+}
+
 // ---------- Selo de saldo (barra do topo) ----------
 
 class SeloSaldo extends StatelessWidget {
