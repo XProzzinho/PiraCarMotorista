@@ -112,6 +112,9 @@ class HomePage extends StatelessWidget {
             (dados['placa'] ?? '').toString().trim().isEmpty ||
             (dados['cpf'] ?? '').toString().trim().isEmpty ||
             (dados['rg'] ?? '').toString().trim().isEmpty;
+        if (dados['bloqueado'] == true) {
+          return _Bloqueado(motivo: (dados['motivoBloqueio'] ?? '').toString());
+        }
         if (incompleto) return CompletarCadastroPage(dados: dados);
         if (dados['aprovado'] != true) return const _EmAnalise();
         return _MapaMotorista(dados: dados);
@@ -235,26 +238,29 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     iniciarNotificacoes();
   }
 
-  int get _saldo => saldoTokens(widget.dados);
+  int get _saldo => saldoCentavos(widget.dados);
 
   // Acompanha o saldo: avisa quando estiver acabando e deixa offline ao zerar.
   @override
   void didUpdateWidget(covariant _MapaMotorista antigo) {
     super.didUpdateWidget(antigo);
-    final antes = saldoTokens(antigo.dados);
+    final antes = saldoCentavos(antigo.dados);
     final agora = _saldo;
-    if (agora < antes && agora <= avisoTokens) notificarTokens(agora);
-    if (agora <= 0 && _online) {
+    if (agora < antes && agora <= avisoSaldo) notificarSaldo(agora);
+    final bloqueado = widget.dados['bloqueado'] == true;
+    if ((!podeRodar(agora) || bloqueado) && _online && _corridaId == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted || !_online) return;
         _alternarOnline();
-        _aviso('Seus tokens acabaram. Compre mais na loja para ficar online.');
+        if (!bloqueado) {
+          _aviso('Seu saldo chegou no limite. Faça uma recarga para ficar online.');
+        }
       });
     }
   }
 
   void _abrirLoja() => Navigator.push(
-      context, MaterialPageRoute(builder: (_) => const LojaTokensPage()));
+      context, MaterialPageRoute(builder: (_) => const LojaSaldoPage()));
 
   // ---------- Presença no mapa do passageiro ----------
   // Motorista online e livre publica a posição no próprio cadastro
@@ -427,8 +433,9 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   // ---------- Online / pedidos ----------
 
   void _alternarOnline() {
-    if (!_online && _saldo <= 0) {
-      _aviso('Você está sem tokens. Compre mais para ficar online.');
+    if (!_online && !podeRodar(_saldo)) {
+      _aviso('Seu saldo chegou no limite de ${reais(limiteNegativo)}. '
+          'Faça uma recarga para ficar online.');
       _abrirLoja();
       return;
     }
@@ -681,19 +688,24 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     try {
       final ref = _db.collection('corridas').doc(id);
       final eu = _db.collection('users').doc(_uid);
-      // Aceitar a corrida gasta 1 token.
+      // Aceitar a corrida desconta R$ 0,50 (ou R$ 1,00 com saldo negativo).
       await _db.runTransaction((tx) async {
         final snap = await tx.get(ref);
         final perfil = await tx.get(eu);
         if (snap.data()?['status'] != 'solicitada') {
           throw 'Essa corrida já foi aceita por outro motorista.';
         }
-        if (saldoTokens(perfil.data()) <= 0) {
-          throw 'Você está sem tokens. Compre mais na loja.';
+        final saldo = saldoCentavos(perfil.data());
+        if (!podeRodar(saldo)) {
+          throw 'Seu saldo chegou no limite. Faça uma recarga na loja.';
         }
-        tx.update(ref,
-            {'status': 'aceita', 'motoristaId': _uid, 'tokenCobrado': true});
-        tx.update(eu, {'tokens': FieldValue.increment(-1)});
+        final custo = custoCorrida(saldo);
+        tx.update(ref, {
+          'status': 'aceita',
+          'motoristaId': _uid,
+          'taxaCentavos': custo,
+        });
+        tx.update(eu, {'saldoCentavos': saldo - custo});
       });
       setState(() {
         _ofertaId = null;
@@ -1238,7 +1250,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
         nome: nome,
         subtitulo: [
           if (placa.isNotEmpty) placa,
-          '$_saldo ${_saldo == 1 ? 'token' : 'tokens'}',
+          'Saldo ${reais(_saldo)}',
         ].join(' · '),
         foto: FotoPerfil(dados: d, raio: 38),
         onFoto: () => trocarFotoPerfil(context),
@@ -1246,7 +1258,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
       itens: [
         GanhosHojeTile(uid: _uid),
         const SizedBox(height: 10),
-        ItemMenu(Icons.toll_outlined, 'Loja de tokens', () {
+        ItemMenu(Icons.account_balance_wallet_outlined, 'Recarregar saldo', () {
           Navigator.pop(context);
           _abrirLoja();
         }, destaque: true),
@@ -1305,7 +1317,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
                             : PainelOnline(
                                 uid: _uid,
                                 saldo: _saldo,
-                                aviso: avisoTokens,
+                                aviso: avisoSaldo,
                                 onOffline: () {
                                   if (_online) _alternarOnline();
                                 },
@@ -1324,7 +1336,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     return PainelOffline(
       uid: _uid,
       saldo: _saldo,
-      aviso: avisoTokens,
+      aviso: avisoSaldo,
       onOnline: () {
         if (!_online) _alternarOnline();
       },
@@ -1727,7 +1739,7 @@ class _CartaoPassageiro extends StatelessWidget {
   }
 }
 
-/// Configurações do motorista: foto, dados do carro, tokens,
+/// Configurações do motorista: foto, dados do carro, saldo,
 /// Editar dados e Excluir minha conta.
 class _ConfiguracoesMotorista extends StatelessWidget {
   const _ConfiguracoesMotorista({required this.uid});
@@ -1746,7 +1758,7 @@ class _ConfiguracoesMotorista extends StatelessWidget {
             .snapshots(),
         builder: (context, snap) {
           final d = snap.data?.data() ?? const <String, dynamic>{};
-          final saldo = saldoTokens(d);
+          final saldo = saldoCentavos(d);
           return ListView(
             padding: const EdgeInsets.fromLTRB(18, 24, 18, 32),
             children: [
@@ -1771,13 +1783,13 @@ class _ConfiguracoesMotorista extends StatelessWidget {
                 child: Row(
                   children: [
                     const Expanded(
-                      child: Text('Tokens',
+                      child: Text('Saldo',
                           style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w600,
                               color: corMenuTitulo)),
                     ),
-                    Text('$saldo',
+                    Text(reais(saldo),
                         style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
@@ -1805,6 +1817,70 @@ class _ConfiguracoesMotorista extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+/// Tela que aparece quando a administração bloqueia o motorista.
+class _Bloqueado extends StatelessWidget {
+  const _Bloqueado({required this.motivo});
+
+  final String motivo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0B2545),
+      body: SafeArea(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(22),
+                  decoration: BoxDecoration(
+                    color: Colors.red.shade600,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.block, color: Colors.white, size: 56),
+                ),
+                const SizedBox(height: 22),
+                const Text('Você está bloqueado pela administração',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800)),
+                const SizedBox(height: 10),
+                Text(
+                  motivo.trim().isNotEmpty
+                      ? motivo
+                      : 'Enquanto estiver bloqueado, você não pode ficar '
+                          'online nem receber corridas. Fale com a '
+                          'administração do PiraCar.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                      color: Color(0xFFC9D6EA), fontSize: 15, height: 1.4),
+                ),
+                const SizedBox(height: 28),
+                OutlinedButton.icon(
+                  onPressed: () => FirebaseAuth.instance.signOut(),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: const BorderSide(color: Colors.white54),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 14),
+                  ),
+                  icon: const Icon(Icons.logout),
+                  label: const Text('Sair'),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cadastro_veiculo.dart';
+import 'creditos.dart';
 
 const _azulNoite = Color(0xFF0B2545);
 const _azul = Color(0xFF1565C0);
@@ -447,21 +448,7 @@ class _LoginPageState extends State<LoginPage> {
           ],
         ),
         const SizedBox(height: 28),
-        const Center(
-          child: Text.rich(
-            TextSpan(
-              children: [
-                TextSpan(text: 'Desenvolvido por '),
-                TextSpan(
-                    text: 'Geanderson Alves',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
-                TextSpan(text: '  @GeanAlves'),
-              ],
-            ),
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12.5, color: Color(0xFF8A94A6)),
-          ),
-        ),
+        const Center(child: CreditosRodape()),
       ],
     );
   }
