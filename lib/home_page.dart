@@ -144,7 +144,7 @@ class _EmAnalise extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               TextButton.icon(
-                onPressed: () => excluirConta(context, colecoesExtras: ['cnh']),
+                onPressed: () => excluirConta(context, colecoesExtras: ['cnh', 'carros']),
                 style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFFC62828)),
                 icon: const Icon(Icons.person_remove),
@@ -1830,7 +1830,7 @@ class _ConfiguracoesMotorista extends StatelessWidget {
                   ),
                 ),
                 onExcluir: () async {
-                  await excluirConta(context, colecoesExtras: ['cnh']);
+                  await excluirConta(context, colecoesExtras: ['cnh', 'carros']);
                   if (FirebaseAuth.instance.currentUser == null &&
                       context.mounted) {
                     Navigator.of(context).popUntil((r) => r.isFirst);
