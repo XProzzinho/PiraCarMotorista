@@ -64,10 +64,20 @@ class DesenhoVeiculo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final id = todasCategorias.any((c) => c.id == categoria)
+        ? categoria
+        : 'piracar';
     return SizedBox(
       width: largura,
       height: largura * 0.46,
-      child: CustomPaint(painter: _VeiculoPainter(categoria)),
+      child: Image.asset(
+        'assets/veiculos/$id.png',
+        fit: BoxFit.contain,
+        filterQuality: FilterQuality.medium,
+        // sem a imagem, usa o desenho
+        errorBuilder: (_, __, ___) =>
+            CustomPaint(painter: _VeiculoPainter(categoria)),
+      ),
     );
   }
 }
