@@ -37,14 +37,15 @@ class PainelOffline extends StatelessWidget {
             width: 66,
             height: 66,
             decoration: BoxDecoration(
-              color: _azul,
+              color: amareloPainel,
               shape: BoxShape.circle,
               boxShadow: [
-                BoxShadow(color: _azul.withOpacity(0.3), spreadRadius: 6),
+                BoxShadow(
+                    color: amareloPainel.withOpacity(0.3), spreadRadius: 6),
               ],
             ),
             child: const Icon(Icons.power_settings_new,
-                color: Colors.white, size: 34),
+                color: _azulNoite, size: 34),
           ),
           titulo: 'Você está offline',
           subtitulo: semTokens
@@ -58,7 +59,8 @@ class PainelOffline extends StatelessWidget {
             child: FilledButton.icon(
               onPressed: onLoja,
               style: FilledButton.styleFrom(
-                backgroundColor: _azulEscuro,
+                backgroundColor: amareloPainel,
+                foregroundColor: _azulNoite,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(40)),
                 textStyle:
@@ -168,7 +170,7 @@ class _CartaoStatus extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: _azulNoite,
+        color: const Color(0x1AFFFFFF),
         borderRadius: BorderRadius.circular(20),
       ),
       child: Row(
@@ -187,7 +189,7 @@ class _CartaoStatus extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(subtitulo,
                     style: const TextStyle(
-                        color: Color(0xFFC9D6EA), fontSize: 13.5)),
+                        color: azulClaroPainel, fontSize: 13.5)),
               ],
             ),
           ),
@@ -211,14 +213,14 @@ class GanhosHojeTile extends StatelessWidget {
         height: 64,
         padding: const EdgeInsets.symmetric(horizontal: 16),
         decoration: BoxDecoration(
-          color: _azulNoite,
+          color: const Color(0x1AFFFFFF),
           borderRadius: BorderRadius.circular(18),
         ),
         child: Row(
           children: [
             const Expanded(
               child: Text('Ganhos de hoje',
-                  style: TextStyle(color: Color(0xFFC9D6EA), fontSize: 14)),
+                  style: TextStyle(color: azulClaroPainel, fontSize: 14)),
             ),
             Text(real(ganhos),
                 style: const TextStyle(
@@ -265,8 +267,8 @@ class PainelOnline extends StatelessWidget {
           child: OutlinedButton.icon(
             onPressed: onOffline,
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFFD32F2F),
-              side: const BorderSide(color: Color(0xFFD32F2F), width: 2),
+              foregroundColor: const Color(0xFFFF8A80),
+              side: const BorderSide(color: Color(0xFFFF8A80), width: 2),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(40)),
               textStyle:
@@ -345,7 +347,7 @@ class _Mini extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: alerta ? ta(Color(0xFFFFF3E0)) : const Color(0xFFF3F4F6),
+      color: alerta ? const Color(0x33FFD23F) : const Color(0x1AFFFFFF),
       borderRadius: BorderRadius.circular(12),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
@@ -359,7 +361,7 @@ class _Mini extends StatelessWidget {
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style:
-                      const TextStyle(fontSize: 12, color: Color(0xFF6B7280))),
+                      const TextStyle(fontSize: 12, color: azulClaroPainel)),
               const SizedBox(height: 2),
               FittedBox(
                 fit: BoxFit.scaleDown,
@@ -369,8 +371,8 @@ class _Mini extends StatelessWidget {
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
                         color: alerta
-                            ? const Color(0xFFE65100)
-                            : const Color(0xFF111111))),
+                            ? amareloPainel
+                            : Colors.white)),
               ),
             ],
           ),
@@ -428,11 +430,11 @@ class _DeslizarOnlineState extends State<DeslizarOnline>
       return Container(
         height: _altura,
         decoration: BoxDecoration(
-          gradient: const LinearGradient(colors: [_azulEscuro, _azul]),
+          color: amareloPainel,
           borderRadius: BorderRadius.circular(40),
           boxShadow: [
             BoxShadow(
-                color: _azul.withOpacity(0.35),
+                color: amareloPainel.withOpacity(0.3),
                 blurRadius: 16,
                 offset: const Offset(0, 6)),
           ],
@@ -450,11 +452,11 @@ class _DeslizarOnlineState extends State<DeslizarOnline>
                       TextSpan(text: 'Deslize para ficar online'),
                       TextSpan(
                           text: '  ›››',
-                          style: TextStyle(color: Color(0x99FFFFFF))),
+                          style: TextStyle(color: Color(0x990B2545))),
                     ],
                   ),
                   style: TextStyle(
-                      color: Colors.white,
+                      color: _azulNoite,
                       fontSize: 17,
                       fontWeight: FontWeight.w800),
                 ),
@@ -479,7 +481,7 @@ class _DeslizarOnlineState extends State<DeslizarOnline>
                     ],
                   ),
                   child: const Icon(Icons.chevron_right_rounded,
-                      color: _azulEscuro, size: 32),
+                      color: _azulNoite, size: 32),
                 ),
               ),
             ),

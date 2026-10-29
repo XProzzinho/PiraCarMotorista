@@ -154,3 +154,34 @@ Future<void> escolherAparencia(BuildContext context) async {
   );
   if (nova != null && nova != escolhaTema) await mudarTema(nova);
 }
+
+// ---- Painéis azul-escuros (estilo novo) ----
+// Mesmas funções, mas devolvem tons para o fundo azul-escuro dos painéis.
+const azulPainel = Color(0xFF14213D);
+const azulPainel2 = Color(0xFF1F3563);
+const amareloPainel = Color(0xFFFFD23F);
+const azulClaroPainel = Color(0xFFAAB8D6);
+
+/// Fundo azul-escuro (gradiente) dos painéis de baixo.
+const decoracaoPainelAzul = BoxDecoration(
+  gradient: LinearGradient(
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+      colors: [azulPainel, azulPainel2]),
+  borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
+  boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 14)],
+);
+
+/// Tema escuro para o conteúdo dos painéis (texto branco, botões claros).
+ThemeData temaPainelAzul() => ThemeData(
+      brightness: Brightness.dark,
+      useMaterial3: true,
+      colorSchemeSeed: azulPainel2,
+    );
+
+Color pfu(Color _) => const Color(0x14FFFFFF);
+Color psup(Color _) => const Color(0x1AFFFFFF);
+Color pta(Color _) => const Color(0x1FFFFFFF);
+Color pln(Color _) => const Color(0x33FFFFFF);
+Color ptx(Color _) => Colors.white;
+Color pfr(Color _) => azulClaroPainel;

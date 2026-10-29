@@ -1444,25 +1444,17 @@ class _MapaMotoristaState extends State<_MapaMotorista>
       constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height *
               (_podeReceber && _oferta != null ? 0.6 : 0.45)),
-      decoration: BoxDecoration(
-        color: sup(Colors.white),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 10)],
-      ),
+      decoration: decoracaoPainelAzul,
       child: SafeArea(
         top: false,
-        child: Column(
+        child: Theme(
+          data: temaPainelAzul(),
+          child: Material(
+          type: MaterialType.transparency,
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(
-              margin: const EdgeInsets.only(top: 10, bottom: 6),
-              width: 44,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.grey.shade400,
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
+            const SizedBox(height: 14),
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
@@ -1486,6 +1478,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
               ),
             ),
           ],
+        ),
+        ),
         ),
       ),
     );
@@ -1524,8 +1518,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
         ? vg.metros
         : ((d['distanciaKm'] is num) ? (d['distanciaKm'] as num) * 1000 : null);
     final longa = vg != null && vg.segundos > 45 * 60;
-    const cinza = TextStyle(fontSize: 14, color: Colors.black54);
-    const forte = TextStyle(fontSize: 15, fontWeight: FontWeight.w700);
+    const cinza = TextStyle(fontSize: 14, color: azulClaroPainel);
+    const forte = TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: Colors.white);
     final exclusiva = d['ofertadoPara'] == _uid;
 
     return Column(
@@ -1537,7 +1531,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F0FE),
+              color: const Color(0x26FFD23F),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Text(
@@ -1545,7 +1539,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
               style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: tx(Color(0xFF0B2545))),
+                  color: Colors.white),
             ),
           ),
         if (exclusiva)
@@ -1567,14 +1561,14 @@ class _MapaMotoristaState extends State<_MapaMotorista>
                     child: LinearProgressIndicator(
                       value: v,
                       minHeight: 6,
-                      backgroundColor: Colors.grey.shade200,
-                      color: v > 0.33 ? const Color(0xFF276EF1) : Colors.red,
+                      backgroundColor: const Color(0x33FFFFFF),
+                      color: v > 0.33 ? amareloPainel : Colors.redAccent,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Você é o motorista mais perto • ${(v * _tempoOferta).ceil()} s para aceitar',
-                    style: TextStyle(fontSize: 12, color: fr(Colors.black54)),
+                    style: TextStyle(fontSize: 12, color: azulClaroPainel),
                   ),
                 ],
               ),
@@ -1585,7 +1579,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.black,
+                color: const Color(0x26FFFFFF),
                 borderRadius: BorderRadius.circular(6),
               ),
               child: Row(
@@ -1606,7 +1600,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
               const SizedBox(width: 8),
               Text(forma,
                   style: const TextStyle(
-                      color: _azul,
+                      color: amareloPainel,
                       fontWeight: FontWeight.w600,
                       fontSize: 13)),
             ],
@@ -1615,17 +1609,17 @@ class _MapaMotoristaState extends State<_MapaMotorista>
               Padding(
                 padding: const EdgeInsets.only(right: 4),
                 child: Text('+$_outrosPedidos',
-                    style: TextStyle(color: fr(Colors.black45))),
+                    style: TextStyle(color: azulClaroPainel)),
               ),
             Material(
-              color: Colors.grey.shade200,
+              color: const Color(0x26FFFFFF),
               shape: const CircleBorder(),
               child: InkWell(
                 customBorder: const CircleBorder(),
                 onTap: _aceitando ? null : _recusarOferta,
                 child: const Padding(
                   padding: EdgeInsets.all(6),
-                  child: Icon(Icons.close, size: 20),
+                  child: Icon(Icons.close, size: 20, color: Colors.white),
                 ),
               ),
             ),
@@ -1636,6 +1630,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           Text(real(valor),
               style: const TextStyle(
                   fontSize: 36,
+                  color: amareloPainel,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.5)),
         const SizedBox(height: 4),
@@ -1649,11 +1644,11 @@ class _MapaMotoristaState extends State<_MapaMotorista>
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w600),
+                    fontSize: 15, fontWeight: FontWeight.w600, color: Colors.white),
               ),
             ),
             const SizedBox(width: 8),
-            Icon(Icons.star_rounded, size: 18, color: tx(Colors.black87)),
+            Icon(Icons.star_rounded, size: 18, color: amareloPainel),
             const SizedBox(width: 3),
             Text(
               _ofertaNota == null
@@ -1678,16 +1673,16 @@ class _MapaMotoristaState extends State<_MapaMotorista>
                       width: 10,
                       height: 10,
                       decoration: const BoxDecoration(
-                          color: Colors.black, shape: BoxShape.circle),
+                          color: Colors.white, shape: BoxShape.circle),
                     ),
                     Expanded(
                       child: Container(
                         width: 2,
                         margin: const EdgeInsets.symmetric(vertical: 4),
-                        color: ln(Colors.black26),
+                        color: const Color(0x55FFFFFF),
                       ),
                     ),
-                    Container(width: 10, height: 10, color: Colors.black),
+                    Container(width: 10, height: 10, color: amareloPainel),
                     const SizedBox(height: 22),
                   ],
                 ),
@@ -1725,7 +1720,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           const SizedBox(height: 6),
           Row(
             children: [
-              Icon(Icons.route, size: 18, color: fr(Colors.black54)),
+              Icon(Icons.route, size: 18, color: azulClaroPainel),
               SizedBox(width: 6),
               Text('Viagem longa (mais de 45 min)', style: cinza),
             ],
@@ -1737,7 +1732,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           height: 54,
           child: FilledButton(
             style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF276EF1),
+              backgroundColor: amareloPainel,
+              foregroundColor: azulPainel,
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(10)),
               textStyle:
@@ -1749,7 +1745,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
                     width: 22,
                     height: 22,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2.5, color: Colors.white))
+                        strokeWidth: 2.5, color: azulPainel))
                 : const Text('Aceitar'),
           ),
         ),
@@ -1781,10 +1777,10 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           Text(
             'Você recebe: ${real(valor)}${forma != null ? ' • $forma' : ''}',
             style: const TextStyle(
-                fontSize: 16, fontWeight: FontWeight.bold, color: _verde),
+                fontSize: 16, fontWeight: FontWeight.bold, color: amareloPainel),
           ),
         Text('O pagamento é feito direto pelo passageiro no fim.',
-            style: TextStyle(fontSize: 12, color: fr(Colors.black54))),
+            style: TextStyle(fontSize: 12, color: azulClaroPainel)),
         const SizedBox(height: 10),
         _BotoesNavegacao(
           alvo: c[indoBuscar ? 'origem' : 'destino'],
@@ -1796,12 +1792,12 @@ class _MapaMotoristaState extends State<_MapaMotorista>
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFFE8F0FE),
+              color: const Color(0x26FFD23F),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Row(
               children: [
-                Icon(Icons.queue, size: 18, color: Color(0xFF276EF1)),
+                Icon(Icons.queue, size: 18, color: amareloPainel),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1818,6 +1814,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           SizedBox(
             width: double.infinity,
             child: FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: amareloPainel, foregroundColor: azulPainel),
               onPressed: () => _mudarStatus('em_andamento'),
               child: const Text('Iniciar corrida'),
             ),
@@ -1833,7 +1831,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           SizedBox(
             width: double.infinity,
             child: FilledButton(
-              style: FilledButton.styleFrom(backgroundColor: _verde),
+              style: FilledButton.styleFrom(
+                  backgroundColor: amareloPainel, foregroundColor: azulPainel),
               onPressed: () => _mudarStatus('finalizada'),
               child: const Text('Finalizar corrida'),
             ),
@@ -1914,7 +1913,7 @@ class _CartaoPassageiro extends StatelessWidget {
           margin: const EdgeInsets.only(bottom: 10),
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: fu(Color(0xFFF4F6FA)),
+            color: const Color(0x1AFFFFFF),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Row(
@@ -1926,7 +1925,7 @@ class _CartaoPassageiro extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Passageiro',
-                        style: TextStyle(fontSize: 12, color: fr(Colors.black54))),
+                        style: TextStyle(fontSize: 12, color: azulClaroPainel)),
                     Text((m['nome'] ?? 'Passageiro').toString(),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -2129,8 +2128,8 @@ class _BotoesNavegacao extends StatelessWidget {
             label: Text(texto),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size.fromHeight(48),
-              foregroundColor: tx(Color(0xFF0F172A)),
-              side: BorderSide(color: ln(Color(0xFFE2E8F0)), width: 1.5),
+              foregroundColor: Colors.white,
+              side: const BorderSide(color: Color(0x44FFFFFF), width: 1.5),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14)),
               textStyle:
@@ -2143,7 +2142,7 @@ class _BotoesNavegacao extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Navegar $rotulo com:',
-            style: TextStyle(fontSize: 13, color: fr(Colors.black54))),
+            style: TextStyle(fontSize: 13, color: azulClaroPainel)),
         const SizedBox(height: 6),
         Row(
           children: [
