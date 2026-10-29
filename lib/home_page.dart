@@ -23,6 +23,7 @@ import 'painel_offline.dart';
 import 'rota.dart';
 import 'tokens.dart';
 import 'cores.dart';
+import 'pulso_chamando.dart';
 
 const _azul = Color(0xFF1E88E5);
 const _verde = Color(0xFF2E7D32);
@@ -1439,12 +1440,13 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   }
 
   Widget _painelInferior() {
-    return Container(
-      width: double.infinity,
+    final chamando = _oferta != null &&
+        (_corridaId != null ? _quaseLivre : (_online && _podeReceber));
+    return PainelChamando(
+      ativo: chamando,
       constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height *
               (_podeReceber && _oferta != null ? 0.6 : 0.45)),
-      decoration: decoracaoPainelAzul,
       child: SafeArea(
         top: false,
         child: Theme(
@@ -1507,6 +1509,87 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   String _km(num metros) =>
       '${(metros / 1000).toStringAsFixed(1).replaceAll('.', ',')} km';
 
+  /// Clientes que esperam na fila enquanto o motorista vê a oferta atual.
+  Widget _listaEspera() {
+    final espera = _visiveis
+        .where((d) => d.id != _ofertaId && !_recusei(d))
+        .toList();
+    if (espera.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+      decoration: BoxDecoration(
+        color: const Color(0x14FFFFFF),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+              '🔔 ${espera.length} ${espera.length == 1 ? 'CLIENTE' : 'CLIENTES'} EM ESPERA',
+              style: const TextStyle(
+                  color: amareloPainel,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2)),
+          const SizedBox(height: 6),
+          for (var i = 0; i < espera.length && i < 3; i++)
+            Builder(builder: (context) {
+              final m = espera[i].data();
+              final v = m['valor'];
+              final km = m['distanciaKm'];
+              return Container(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: i == 0
+                    ? null
+                    : const BoxDecoration(
+                        border: Border(
+                            top: BorderSide(color: Color(0x1FFFFFFF)))),
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 16,
+                      backgroundColor: const Color(0x33FFFFFF),
+                      child: Text('${i + 2}',
+                          style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w800)),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                              (m['destinoTexto'] ?? 'Destino').toString(),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w700)),
+                          if (km is num)
+                            Text(
+                                'Viagem de ${km.toStringAsFixed(1).replaceAll('.', ',')} km',
+                                style: const TextStyle(
+                                    color: azulClaroPainel, fontSize: 12)),
+                        ],
+                      ),
+                    ),
+                    if (v is num)
+                      Text(real(v),
+                          style: const TextStyle(
+                              color: amareloPainel,
+                              fontWeight: FontWeight.w800)),
+                  ],
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
   Widget _cartaoOferta() {
     final d = _oferta!;
     final id = _ofertaId!;
@@ -1525,6 +1608,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const EtiquetaChamando(),
         if (_corridaId != null)
           Container(
             width: double.infinity,
@@ -1726,6 +1810,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
             ],
           ),
         ],
+        _listaEspera(),
         const SizedBox(height: 14),
         SizedBox(
           width: double.infinity,
