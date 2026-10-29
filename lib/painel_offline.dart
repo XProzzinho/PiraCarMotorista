@@ -243,6 +243,8 @@ class PainelOnline extends StatelessWidget {
     required this.aviso,
     required this.onOffline,
     required this.onLoja,
+    this.semLocalizacao = false,
+    this.onLocalizacao,
   });
 
   final String uid;
@@ -251,16 +253,46 @@ class PainelOnline extends StatelessWidget {
   final VoidCallback onOffline;
   final VoidCallback onLoja;
 
+  /// Online mas sem posição do GPS: o passageiro não encontra o motorista.
+  final bool semLocalizacao;
+  final VoidCallback? onLocalizacao;
+
   @override
   Widget build(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const _CartaoStatus(
-          icone: _Pulso(),
-          titulo: 'Você está online',
-          subtitulo: 'Procurando corridas perto de você...',
-        ),
+        if (semLocalizacao) ...[
+          const _CartaoStatus(
+            icone: CircleAvatar(
+              radius: 28,
+              backgroundColor: Color(0xFFEF6C00),
+              child: Icon(Icons.location_off, color: Colors.white, size: 28),
+            ),
+            titulo: 'Sem localização',
+            subtitulo: 'Os passageiros não te encontram enquanto o GPS '
+                'não mostrar onde você está.',
+          ),
+          const SizedBox(height: 10),
+          SizedBox(
+            height: 50,
+            child: FilledButton.icon(
+              onPressed: onLocalizacao,
+              style: FilledButton.styleFrom(
+                backgroundColor: const Color(0xFFEF6C00),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(40)),
+              ),
+              icon: const Icon(Icons.my_location),
+              label: const Text('Ativar localização'),
+            ),
+          ),
+        ] else
+          const _CartaoStatus(
+            icone: _Pulso(),
+            titulo: 'Você está online',
+            subtitulo: 'Procurando corridas perto de você...',
+          ),
         const SizedBox(height: 14),
         SizedBox(
           height: 58,

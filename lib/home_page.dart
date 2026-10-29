@@ -196,6 +196,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
       BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueAzure);
 
   StreamSubscription<Position>? _subPos;
+  StreamSubscription<ServiceStatus>? _subGps;
+  Timer? _retentarPos;
   StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _subPedidos;
   final Set<String> _vistos = {};
 
@@ -374,6 +376,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     _batida?.cancel();
     if (_online) _sairDoMapa();
     _subPos?.cancel();
+    _subGps?.cancel();
+    _retentarPos?.cancel();
     _subPedidos?.cancel();
     _subCorrida?.cancel();
     _subProxima?.cancel();
@@ -403,7 +407,17 @@ class _MapaMotoristaState extends State<_MapaMotorista>
 
   // ---------- Localização ----------
 
+  // Sem posição o motorista não aparece para o passageiro: o pedido só
+  // chega depois de 60 s (quando fica aberto para todos).
   Future<void> _iniciarLocalizacao() async {
+    // GPS desligado e ligado depois: recomeça sozinho
+    _subGps ??= Geolocator.getServiceStatusStream().listen((s) {
+      if (s == ServiceStatus.enabled) _iniciarLocalizacao();
+    }, onError: (_) {});
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      _aviso('Ligue a localização (GPS) do celular para receber corridas.');
+      return;
+    }
     var perm = await Geolocator.checkPermission();
     if (perm == LocationPermission.denied) {
       perm = await Geolocator.requestPermission();
@@ -413,11 +427,35 @@ class _MapaMotoristaState extends State<_MapaMotorista>
       _aviso('Permita o acesso à localização para usar o app.');
       return;
     }
+    // a última posição conhecida aparece na hora; a precisa vem em seguida
     try {
-      final p = await Geolocator.getCurrentPosition();
-      _novaPosicao(p, centralizar: true);
+      final ultima = await Geolocator.getLastKnownPosition();
+      if (ultima != null && _eu == null) _novaPosicao(ultima, centralizar: true);
     } catch (_) {}
     _ouvirPosicao();
+    try {
+      final p = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
+      _novaPosicao(p, centralizar: true);
+    } catch (_) {}
+  }
+
+  // Botão do painel online quando o app está sem localização.
+  Future<void> _resolverLocalizacao() async {
+    if (!await Geolocator.isLocationServiceEnabled()) {
+      await Geolocator.openLocationSettings();
+      return;
+    }
+    final perm = await Geolocator.checkPermission();
+    if (perm == LocationPermission.deniedForever) {
+      await Geolocator.openAppSettings();
+      return;
+    }
+    await _iniciarLocalizacao();
   }
 
   // Online: a localização roda como serviço do Android (aviso fixo na
@@ -441,7 +479,13 @@ class _MapaMotoristaState extends State<_MapaMotorista>
               accuracy: LocationAccuracy.high,
               distanceFilter: 4,
             ),
-    ).listen((p) => _novaPosicao(p), onError: (_) {});
+    ).listen((p) => _novaPosicao(p), onError: (_) {
+      // o Android derrubou a localização: tenta de novo em 5 s
+      _retentarPos?.cancel();
+      _retentarPos = Timer(const Duration(seconds: 5), () {
+        if (mounted) _ouvirPosicao();
+      });
+    });
   }
 
   void _novaPosicao(Position p, {bool centralizar = false}) {
@@ -1524,6 +1568,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
                                   if (_online) _alternarOnline();
                                 },
                                 onLoja: _abrirLoja,
+                                semLocalizacao: _eu == null,
+                                onLocalizacao: _resolverLocalizacao,
                               ))
                         : _painelOffline()),
               ),
