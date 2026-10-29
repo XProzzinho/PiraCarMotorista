@@ -1,50 +1,49 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// Cores do app. O modo escuro foi desligado: tudo fica no visual claro.
+/// Cores do app, com modo claro e modo escuro (preto e branco).
 ///
 /// As funções abaixo recebem a cor do modo claro e devolvem a cor certa
 /// para o modo atual. No modo claro devolvem a própria cor (o visual não
-/// muda); no escuro trocam por tons escuros.
+/// muda); no escuro trocam por tons de preto, cinza e branco.
 /// Este arquivo é igual nos três apps.
 
-/// Escolha da pessoa: 'auto' (segue o celular), 'claro' ou 'escuro'.
-String escolhaTema = 'auto';
+/// Escolha da pessoa: 'claro' (padrão) ou 'escuro'.
+String escolhaTema = 'claro';
 
-bool _calcular() => escolhaTema == 'claro'
-    ? false
-    : (escolhaTema == 'escuro' ? true : _celularEscuro());
-
-final modoEscuro = ValueNotifier<bool>(_celularEscuro());
+final modoEscuro = ValueNotifier<bool>(false);
 
 /// Lê a escolha salva no celular. Chame no main(), antes do runApp.
-Future<void> carregarTema() async {}
+Future<void> carregarTema() async {
+  try {
+    final p = await SharedPreferences.getInstance();
+    escolhaTema = p.getString('tema') == 'escuro' ? 'escuro' : 'claro';
+  } catch (_) {}
+  modoEscuro.value = escolhaTema == 'escuro';
+}
 
 /// Troca a aparência e guarda a escolha.
-Future<void> mudarTema(String escolha) async {}
-
-const nomesTema = {
-  'auto': 'Automático',
-  'claro': 'Claro',
-  'escuro': 'Escuro',
-};
-
-bool _celularEscuro() =>
-    SchedulerBinding.instance.platformDispatcher.platformBrightness ==
-    Brightness.dark;
+Future<void> mudarTema(String escolha) async {
+  escolhaTema = escolha == 'escuro' ? 'escuro' : 'claro';
+  modoEscuro.value = escolhaTema == 'escuro';
+  try {
+    final p = await SharedPreferences.getInstance();
+    await p.setString('tema', escolhaTema);
+  } catch (_) {}
+}
 
 /// true quando o app está no modo escuro.
-bool get escuro => false;
+bool get escuro => modoEscuro.value;
 
-/// Chamado quando o celular troca entre claro e escuro.
-void atualizarModoEscuro() => modoEscuro.value = _calcular();
+/// Mantido por compatibilidade (o app não segue mais o celular).
+void atualizarModoEscuro() {}
 
-const _fundoEscuro = Color(0xFF0E1420);
-const _cartaoEscuro = Color(0xFF1A2232);
-const _tintaEscura = Color(0xFF1D3150);
-const _linhaEscura = Color(0xFF2C3648);
-const _textoEscuro = Color(0xFFE8EDF5);
-const _fracoEscuro = Color(0xFF9AA7BA);
+const _fundoEscuro = Color(0xFF0A0A0A);
+const _cartaoEscuro = Color(0xFF181818);
+const _tintaEscura = Color(0xFF262626);
+const _linhaEscura = Color(0xFF333333);
+const _textoEscuro = Color(0xFFF5F5F5);
+const _fracoEscuro = Color(0xFFA3A3A3);
 
 /// Fundo da tela.
 Color fu(Color claro) => escuro ? _fundoEscuro : claro;
@@ -65,33 +64,48 @@ Color tx(Color claro) => escuro ? _textoEscuro : claro;
 Color fr(Color claro) => escuro ? _fracoEscuro : claro;
 
 /// Tema do app (claro ou escuro) a partir da cor principal.
-ThemeData temaPiraCar(Color semente) => ThemeData(
-      colorSchemeSeed: semente,
-      brightness: escuro ? Brightness.dark : Brightness.light,
-      useMaterial3: true,
-      scaffoldBackgroundColor: escuro ? _fundoEscuro : null,
-      cardColor: escuro ? _cartaoEscuro : null,
-      dialogBackgroundColor: escuro ? _cartaoEscuro : null,
-    );
+ThemeData temaPiraCar(Color semente) => escuro
+    ? ThemeData(
+        useMaterial3: true,
+        brightness: Brightness.dark,
+        colorScheme: const ColorScheme.dark(
+          primary: Colors.white,
+          onPrimary: Colors.black,
+          secondary: Color(0xFFD4D4D4),
+          onSecondary: Colors.black,
+          surface: _cartaoEscuro,
+          onSurface: _textoEscuro,
+        ),
+        scaffoldBackgroundColor: _fundoEscuro,
+        cardColor: _cartaoEscuro,
+        dialogBackgroundColor: _cartaoEscuro,
+        appBarTheme: const AppBarTheme(
+            backgroundColor: Color(0xFF111111), foregroundColor: Colors.white),
+      )
+    : ThemeData(
+        colorSchemeSeed: semente,
+        brightness: Brightness.light,
+        useMaterial3: true,
+      );
 
 /// Estilo escuro do Google Maps (null no modo claro).
 String? get estiloMapa => escuro ? _mapaEscuro : null;
 
 const _mapaEscuro = '''
 [
-  {"elementType":"geometry","stylers":[{"color":"#1d2533"}]},
-  {"elementType":"labels.text.fill","stylers":[{"color":"#8a97ab"}]},
-  {"elementType":"labels.text.stroke","stylers":[{"color":"#1a2130"}]},
-  {"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3a4558"}]},
-  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#222b3b"}]},
-  {"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#1c3328"}]},
-  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#2e3a4f"}]},
-  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#1a2130"}]},
-  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#3d4c66"}]},
-  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#a3b0c2"}]},
-  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#262f40"}]},
-  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0e2238"}]},
-  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#4f6a8a"}]}
+  {"elementType":"geometry","stylers":[{"color":"#1c1c1c"}]},
+  {"elementType":"labels.text.fill","stylers":[{"color":"#9a9a9a"}]},
+  {"elementType":"labels.text.stroke","stylers":[{"color":"#151515"}]},
+  {"featureType":"administrative","elementType":"geometry","stylers":[{"color":"#3a3a3a"}]},
+  {"featureType":"poi","elementType":"geometry","stylers":[{"color":"#222222"}]},
+  {"featureType":"poi.park","elementType":"geometry","stylers":[{"color":"#1f2a22"}]},
+  {"featureType":"road","elementType":"geometry","stylers":[{"color":"#2f2f2f"}]},
+  {"featureType":"road","elementType":"geometry.stroke","stylers":[{"color":"#151515"}]},
+  {"featureType":"road.highway","elementType":"geometry","stylers":[{"color":"#454545"}]},
+  {"featureType":"road","elementType":"labels.text.fill","stylers":[{"color":"#b0b0b0"}]},
+  {"featureType":"transit","elementType":"geometry","stylers":[{"color":"#262626"}]},
+  {"featureType":"water","elementType":"geometry","stylers":[{"color":"#0d0d0d"}]},
+  {"featureType":"water","elementType":"labels.text.fill","stylers":[{"color":"#5a5a5a"}]}
 ]
 ''';
 
@@ -106,21 +120,16 @@ class ObservadorTema extends StatefulWidget {
 }
 
 class _ObservadorTemaState extends State<ObservadorTema>
-    with WidgetsBindingObserver {
+    {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this);
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
-
-  @override
-  void didChangePlatformBrightness() => atualizarModoEscuro();
 
   @override
   Widget build(BuildContext context) {
@@ -132,27 +141,45 @@ class _ObservadorTemaState extends State<ObservadorTema>
   }
 }
 
-/// Janela para escolher a aparência.
-Future<void> escolherAparencia(BuildContext context) async {
-  final nova = await showDialog<String>(
-    context: context,
-    builder: (c) => SimpleDialog(
-      title: const Text('Aparência'),
-      children: [
-        for (final e in nomesTema.entries)
-          RadioListTile<String>(
-            value: e.key,
-            groupValue: escolhaTema,
-            title: Text(e.value),
-            subtitle: e.key == 'auto'
-                ? const Text('Segue o modo do celular')
-                : null,
-            onChanged: (v) => Navigator.pop(c, v),
+/// Linha com o botão de modo escuro, para o menu lateral.
+class ItemModoEscuro extends StatelessWidget {
+  const ItemModoEscuro({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final cor = escuro ? Colors.white : const Color(0xFF4B5563);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(28),
+        onTap: () => mudarTema(escuro ? 'claro' : 'escuro'),
+        child: SizedBox(
+          height: 54,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            child: Row(
+              children: [
+                Icon(escuro ? Icons.dark_mode : Icons.dark_mode_outlined,
+                    size: 26, color: cor),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Text('Modo escuro',
+                      style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w500,
+                          color: cor)),
+                ),
+                Switch(
+                  value: escuro,
+                  onChanged: (v) => mudarTema(v ? 'escuro' : 'claro'),
+                ),
+              ],
+            ),
           ),
-      ],
-    ),
-  );
-  if (nova != null && nova != escolhaTema) await mudarTema(nova);
+        ),
+      ),
+    );
+  }
 }
 
 // ---- Painéis azul-escuros (estilo novo) ----
@@ -163,14 +190,16 @@ const amareloPainel = Color(0xFFFFD23F);
 const azulClaroPainel = Color(0xFFAAB8D6);
 
 /// Fundo azul-escuro (gradiente) dos painéis de baixo.
-const decoracaoPainelAzul = BoxDecoration(
-  gradient: LinearGradient(
-      begin: Alignment.topLeft,
-      end: Alignment.bottomRight,
-      colors: [azulPainel, azulPainel2]),
-  borderRadius: BorderRadius.vertical(top: Radius.circular(26)),
-  boxShadow: [BoxShadow(color: Colors.black38, blurRadius: 14)],
-);
+BoxDecoration get decoracaoPainelAzul => BoxDecoration(
+      gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: escuro
+              ? const [Color(0xFF141414), Color(0xFF2A2A2A)]
+              : const [azulPainel, azulPainel2]),
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(26)),
+      boxShadow: const [BoxShadow(color: Colors.black38, blurRadius: 14)],
+    );
 
 /// Tema escuro para o conteúdo dos painéis (texto branco, botões claros).
 ThemeData temaPainelAzul() => ThemeData(

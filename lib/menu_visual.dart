@@ -37,12 +37,14 @@ class GavetaPiraCar extends StatelessWidget {
           cabecalho,
           const SizedBox(height: 22),
           ...itens,
+          const Divider(height: 24),
+          const ItemModoEscuro(),
           if (rodape) ...[
             const SizedBox(height: 28),
-            const Center(
+            Center(
               child: Text('Desenvolvido por Geanderson Alves @GeanAlves',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: corMenuIcone)),
+                  style: TextStyle(fontSize: 12, color: fr(corMenuIcone))),
             ),
             const SizedBox(height: 4),
             const Center(child: TextoVersao()),
@@ -124,7 +126,7 @@ class CabecalhoMenu extends StatelessWidget {
               if (subtitulo != null && subtitulo!.trim().isNotEmpty) ...[
                 const SizedBox(height: 4),
                 Text(subtitulo!,
-                    style: const TextStyle(fontSize: 13, color: corMenuTexto)),
+                    style: TextStyle(fontSize: 13, color: fr(corMenuTexto))),
               ],
             ],
           ),
@@ -148,11 +150,12 @@ class ItemMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final corTexto = cor ?? (destaque ? corMenuTitulo : corMenuTexto);
+    final corTexto =
+        cor ?? (destaque ? tx(corMenuTitulo) : fr(corMenuTexto));
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
       child: Material(
-        color: destaque ? corMenuDestaque : Colors.transparent,
+        color: destaque ? ta(corMenuDestaque) : Colors.transparent,
         borderRadius: BorderRadius.circular(28),
         child: InkWell(
           borderRadius: BorderRadius.circular(28),
@@ -165,7 +168,8 @@ class ItemMenu extends StatelessWidget {
                 children: [
                   Icon(icone,
                       size: 26,
-                      color: cor ?? (destaque ? corMenuTitulo : corMenuIcone)),
+                      color: cor ??
+                          (destaque ? tx(corMenuTitulo) : fr(corMenuIcone))),
                   const SizedBox(width: 14),
                   Expanded(
                     child: Text(texto,
@@ -210,7 +214,7 @@ void abrirDoMenu(BuildContext context, Widget tela) {
 /// Barra azul-escura com voltar, usada nas telas abertas pelo menu.
 AppBar barraTela(String titulo) => AppBar(
       title: Text(titulo),
-      backgroundColor: corMenuTitulo,
+      backgroundColor: escuro ? const Color(0xFF111111) : corMenuTitulo,
       foregroundColor: Colors.white,
     );
 
@@ -235,7 +239,7 @@ class LinhaDado extends StatelessWidget {
       child: Row(
         children: [
           Text(rotulo,
-              style: const TextStyle(fontSize: 14, color: corMenuTexto)),
+              style: TextStyle(fontSize: 14, color: fr(corMenuTexto))),
           const SizedBox(width: 12),
           Expanded(
             child: Text(vazio ? 'Não informado' : valor,
