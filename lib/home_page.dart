@@ -289,12 +289,12 @@ class _MapaMotoristaState extends State<_MapaMotorista>
         _eu!.latitude, _eu!.longitude, dest.latitude, dest.longitude);
   }
 
-  /// Perto de deixar o passageiro (até 1,2 km) e ainda sem próxima
+  /// Perto de deixar o passageiro (até 1 km) e ainda sem próxima
   /// corrida: já pode receber a próxima.
   bool get _quaseLivre {
     if (!_online || _corridaId == null || _proximaId != null) return false;
     final falta = _faltaParaDeixar;
-    return falta != null && falta <= 1200;
+    return falta != null && falta <= 1000;
   }
 
   /// Pode receber oferta agora (livre, ou terminando a corrida).
