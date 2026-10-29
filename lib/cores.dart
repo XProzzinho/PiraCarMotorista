@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// Modo escuro: Automático (segue o celular), Claro ou Escuro.
+/// Cores do app. O modo escuro foi desligado: tudo fica no visual claro.
 ///
 /// As funções abaixo recebem a cor do modo claro e devolvem a cor certa
 /// para o modo atual. No modo claro devolvem a própria cor (o visual não
@@ -19,23 +18,10 @@ bool _calcular() => escolhaTema == 'claro'
 final modoEscuro = ValueNotifier<bool>(_celularEscuro());
 
 /// Lê a escolha salva no celular. Chame no main(), antes do runApp.
-Future<void> carregarTema() async {
-  try {
-    final p = await SharedPreferences.getInstance();
-    escolhaTema = p.getString('tema') ?? 'auto';
-  } catch (_) {}
-  modoEscuro.value = _calcular();
-}
+Future<void> carregarTema() async {}
 
 /// Troca a aparência e guarda a escolha.
-Future<void> mudarTema(String escolha) async {
-  escolhaTema = escolha;
-  modoEscuro.value = _calcular();
-  try {
-    final p = await SharedPreferences.getInstance();
-    await p.setString('tema', escolha);
-  } catch (_) {}
-}
+Future<void> mudarTema(String escolha) async {}
 
 const nomesTema = {
   'auto': 'Automático',
@@ -48,7 +34,7 @@ bool _celularEscuro() =>
     Brightness.dark;
 
 /// true quando o app está no modo escuro.
-bool get escuro => modoEscuro.value;
+bool get escuro => false;
 
 /// Chamado quando o celular troca entre claro e escuro.
 void atualizarModoEscuro() => modoEscuro.value = _calcular();
