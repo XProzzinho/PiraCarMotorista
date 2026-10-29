@@ -227,6 +227,40 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 
+  // O motorista digita o valor da recarga (em reais inteiros).
+  Future<void> _outroValor() async {
+    final ctrl = TextEditingController();
+    final v = await showDialog<int>(
+      context: context,
+      builder: (c) => AlertDialog(
+        title: const Text('Outro valor'),
+        content: TextField(
+          controller: ctrl,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: const InputDecoration(
+              prefixText: 'R\$ ',
+              hintText: 'Ex.: 15',
+              helperText: 'De R\$ 1 até R\$ 500, em reais inteiros'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(c),
+              child: const Text('Cancelar')),
+          FilledButton(
+              onPressed: () {
+                final n = int.tryParse(ctrl.text) ?? 0;
+                if (n < 1 || n > 500) return;
+                Navigator.pop(c, n);
+              },
+              child: const Text('Usar')),
+        ],
+      ),
+    );
+    if (v != null && mounted) setState(() => _escolhida = v);
+  }
+
   Future<void> _copiarPix() async {
     await Clipboard.setData(const ClipboardData(text: chavePix));
     _aviso('Chave Pix copiada!');
@@ -299,6 +333,14 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
                       if (v != recargas.last) const SizedBox(width: 12),
                     ],
                   ],
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _outroValor,
+                  icon: const Icon(Icons.edit),
+                  label: Text(_escolhida != null && !recargas.contains(_escolhida)
+                      ? 'Outro valor: ${reais(_escolhida! * 100)} (trocar)'
+                      : 'Outro valor'),
                 ),
                 if (_escolhida != null) ...[
                   const SizedBox(height: 16),
