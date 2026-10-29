@@ -595,10 +595,27 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     if (!motoristaAtende(widget.dados, m['categoria'] as String?)) {
       return false;
     }
+    // Pedido abandonado (app do passageiro fechado): sem nenhum sinal há
+    // mais de 3 min, ou criado há mais de 15 min, não toca mais.
+    final agora = DateTime.now();
+    DateTime? ultimo;
+    for (final k in ['ofertadoEm', 'ativoEm', 'criadoEm']) {
+      final v = m[k];
+      if (v is Timestamp && (ultimo == null || v.toDate().isAfter(ultimo))) {
+        ultimo = v.toDate();
+      }
+    }
+    final criado = m['criadoEm'];
+    if (ultimo == null ||
+        agora.difference(ultimo).inSeconds > 180 ||
+        (criado is Timestamp &&
+            agora.difference(criado.toDate()).inMinutes > 15)) {
+      return false;
+    }
     if (m['ofertadoPara'] == _uid) return true;
     final ref = m['ofertadoEm'] ?? m['criadoEm'];
     if (ref is Timestamp) {
-      return DateTime.now().difference(ref.toDate()).inSeconds > 60;
+      return agora.difference(ref.toDate()).inSeconds > 60;
     }
     return false;
   }
