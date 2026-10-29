@@ -24,6 +24,7 @@ import 'painel_offline.dart';
 import 'rota.dart';
 import 'tokens.dart';
 import 'cores.dart';
+import 'avisos_admin.dart';
 import 'pulso_chamando.dart';
 
 const _azul = Color(0xFF1E88E5);
@@ -233,6 +234,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   @override
   void initState() {
     super.initState();
+    iniciarAvisosAdmin('motoristas');
     _vigiaToque = Timer.periodic(
         const Duration(seconds: 1), (_) => _sincronizarToque(_chamando));
     WidgetsBinding.instance.addObserver(this);
