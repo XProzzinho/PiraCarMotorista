@@ -14,6 +14,8 @@ perms = (
     '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>\n'
     '    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>\n'
     '    <uses-permission android:name="android.permission.WAKE_LOCK"/>\n'
+    '    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>\n'
+    '    <uses-permission android:name="android.permission.VIBRATE"/>\n'
     '    '
 )
 assert "<application" in t, "manifest sem <application>"
@@ -24,6 +26,7 @@ meta = (
 )
 t = re.sub(r"(<application[^>]*>)", lambda m: m.group(1) + meta, t, count=1)
 t = re.sub(r'android:label="[^"]*"', 'android:label="Uai Car Motorista"', t, count=1)
+t = re.sub(r"(<activity\b)", r'\1 android:showWhenLocked="true" android:turnScreenOn="true"', t, count=1)
 mf.write_text(t)
 
 # 2) settings.gradle: plugin do Google Services

@@ -233,6 +233,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   @override
   void initState() {
     super.initState();
+    _vigiaToque = Timer.periodic(
+        const Duration(seconds: 1), (_) => _sincronizarToque(_chamando));
     WidgetsBinding.instance.addObserver(this);
     _carregarIcones();
     _iniciarLocalizacao();
@@ -373,6 +375,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     _subPedidos?.cancel();
     _subCorrida?.cancel();
     _subProxima?.cancel();
+    _vigiaToque?.cancel();
+    cancelarNotificacaoCorrida();
     _toque.dispose();
     super.dispose();
   }
@@ -737,10 +741,20 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   final AudioPlayer _toque = AudioPlayer();
   bool _tocando = false;
 
+  bool get _chamando =>
+      _oferta != null &&
+      (_corridaId != null ? _quaseLivre : (_online && _podeReceber));
+
+  // Confere a cada segundo (roda também com o app minimizado, porque o
+  // serviço de localização mantém o app vivo): liga o toque quando um
+  // cliente chama e desliga quando o pedido some.
+  Timer? _vigiaToque;
+
   void _sincronizarToque(bool chamando) {
     if (chamando == _tocando) return;
     _tocando = chamando;
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
+    if (!chamando) cancelarNotificacaoCorrida();
+    () async {
       try {
         if (_tocando) {
           await _toque.setAudioContext(AudioContext(
@@ -757,7 +771,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           await _toque.stop();
         }
       } catch (_) {}
-    });
+    }();
   }
 
   Future<void> _alertar() async {
@@ -1474,9 +1488,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   }
 
   Widget _painelInferior() {
-    final chamando = _oferta != null &&
-        (_corridaId != null ? _quaseLivre : (_online && _podeReceber));
-    _sincronizarToque(chamando);
+    final chamando = _chamando;
     return PainelChamando(
       ativo: chamando,
       constraints: BoxConstraints(

@@ -140,8 +140,9 @@ Future<void> notificarSaldo(int saldo) async {
   } catch (_) {}
 }
 
-/// Aviso de corrida nova, com o som do PiraCar (res/raw/corrida.ogg).
-/// Toca também com o app minimizado.
+/// Aviso de corrida nova com o app minimizado ou com a tela bloqueada.
+/// O som é tocado pelo próprio app (assets/som/corrida.ogg); a notificação
+/// aparece por cima, com vibração, e abre o app ao tocar.
 Future<void> notificarCorrida(String titulo, String texto) async {
   await iniciarNotificacoes();
   try {
@@ -151,20 +152,29 @@ Future<void> notificarCorrida(String titulo, String texto) async {
       texto,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'corridas_piracar2',
-          'Corridas',
-          channelDescription: 'Toque de corrida nova',
+          'corridas_chamada',
+          'Corridas (chamada)',
+          channelDescription: 'Aviso de cliente chamando',
           importance: Importance.max,
           priority: Priority.max,
-          sound: RawResourceAndroidNotificationSound('corrida'),
-          playSound: true,
+          playSound: false,
           enableVibration: true,
+          fullScreenIntent: true,
+          autoCancel: true,
+          timeoutAfter: 25000,
           category: AndroidNotificationCategory.call,
           visibility: NotificationVisibility.public,
-          ticker: 'Nova corrida',
+          ticker: 'Cliente chamando',
         ),
       ),
     );
+  } catch (_) {}
+}
+
+/// Tira o aviso de corrida da barra (pedido aceito, recusado ou expirado).
+Future<void> cancelarNotificacaoCorrida() async {
+  try {
+    await _notificacoes.cancel(21);
   } catch (_) {}
 }
 
