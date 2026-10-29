@@ -34,7 +34,8 @@ class PiraCarMotoristaApp extends StatelessWidget {
           return snap.hasData
               ? const VerificaVersao(
                   campo: 'versaoMinimaMotorista', child: HomePage())
-              : const LoginPage();
+              : const VerificaVersao(
+                  campo: 'versaoMinimaMotorista', child: LoginPage());
         },
       ),
       ),
