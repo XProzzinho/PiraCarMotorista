@@ -151,7 +151,7 @@ Future<void> notificarCorrida(String titulo, String texto) async {
       texto,
       const NotificationDetails(
         android: AndroidNotificationDetails(
-          'corridas_piracar',
+          'corridas_piracar2',
           'Corridas',
           channelDescription: 'Toque de corrida nova',
           importance: Importance.max,
