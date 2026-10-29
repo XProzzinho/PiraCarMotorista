@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:audioplayers/audioplayers.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'cadastro_veiculo.dart';
@@ -372,6 +373,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     _subPedidos?.cancel();
     _subCorrida?.cancel();
     _subProxima?.cancel();
+    _toque.dispose();
     super.dispose();
   }
 
@@ -730,6 +732,34 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     ]);
   }
 
+  // Toque de "cliente chamando" com o app aberto (repete enquanto o pedido
+  // está na tela). Com o app fechado/minimizado quem toca é a notificação.
+  final AudioPlayer _toque = AudioPlayer();
+  bool _tocando = false;
+
+  void _sincronizarToque(bool chamando) {
+    if (chamando == _tocando) return;
+    _tocando = chamando;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      try {
+        if (_tocando) {
+          await _toque.setAudioContext(AudioContext(
+            android: const AudioContextAndroid(
+              usageType: AndroidUsageType.notificationRingtone,
+              contentType: AndroidContentType.sonification,
+              audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+            ),
+          ));
+          await _toque.setReleaseMode(ReleaseMode.loop);
+          await _toque.setVolume(1.0);
+          await _toque.play(AssetSource('som/corrida.ogg'));
+        } else {
+          await _toque.stop();
+        }
+      } catch (_) {}
+    });
+  }
+
   Future<void> _alertar() async {
     // a corrida mais nova oferecida a mim
     Map<String, dynamic>? d;
@@ -738,12 +768,16 @@ class _MapaMotoristaState extends State<_MapaMotorista>
     }
     final valor = d?['valor'];
     final destino = (d?['destinoTexto'] ?? '').toString();
+    final aberto =
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    if (!aberto) {
     notificarCorrida(
       valor is num
           ? 'Nova corrida! R\$ ${valor.toStringAsFixed(2).replaceAll('.', ',')}'
           : 'Nova corrida!',
       destino.isEmpty ? 'Toque para ver e aceitar.' : 'Destino: $destino',
     );
+    }
     HapticFeedback.heavyImpact();
     await Future.delayed(const Duration(milliseconds: 350));
     HapticFeedback.heavyImpact();
@@ -1442,6 +1476,7 @@ class _MapaMotoristaState extends State<_MapaMotorista>
   Widget _painelInferior() {
     final chamando = _oferta != null &&
         (_corridaId != null ? _quaseLivre : (_online && _podeReceber));
+    _sincronizarToque(chamando);
     return PainelChamando(
       ativo: chamando,
       constraints: BoxConstraints(
