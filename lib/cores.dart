@@ -119,26 +119,35 @@ class ObservadorTema extends StatefulWidget {
   State<ObservadorTema> createState() => _ObservadorTemaState();
 }
 
-class _ObservadorTemaState extends State<ObservadorTema>
-    {
-  @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
-  }
+class _ObservadorTemaState extends State<ObservadorTema> {
+  bool _ultimo = escuro;
 
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<bool>(
       valueListenable: modoEscuro,
-      builder: (context, valor, _) =>
-          KeyedSubtree(key: ValueKey(valor), child: widget.builder(context)),
+      builder: (context, valor, _) {
+        if (valor != _ultimo) {
+          _ultimo = valor;
+          // Sem trocar a chave: as telas mantêm o estado (corrida, pedido,
+          // mapa). Só refazemos o desenho de tudo com as cores novas.
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _refazerTudo(context as Element);
+          });
+        }
+        return widget.builder(context);
+      },
     );
   }
+}
+
+void _refazerTudo(Element raiz) {
+  void visitar(Element e) {
+    e.markNeedsBuild();
+    e.visitChildren(visitar);
+  }
+
+  raiz.visitChildren(visitar);
 }
 
 /// Linha com o botão de modo escuro, para o menu lateral.
