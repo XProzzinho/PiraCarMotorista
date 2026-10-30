@@ -11,6 +11,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import 'cadastro_negado.dart';
 import 'cadastro_veiculo.dart';
 import 'categorias.dart';
 import 'chat_corrida.dart';
@@ -124,7 +125,11 @@ class HomePage extends StatelessWidget {
           );
         }
         if (incompleto) return CompletarCadastroPage(dados: dados);
-        if (dados['aprovado'] != true) return const EmAnalisePage();
+        if (dados['aprovado'] != true) {
+          return dados['negado'] == true
+              ? CadastroNegadoPage(dados: dados)
+              : const EmAnalisePage();
+        }
         return _MapaMotorista(dados: dados);
       },
     );
