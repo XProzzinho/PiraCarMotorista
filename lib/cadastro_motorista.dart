@@ -211,6 +211,7 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
         'criadoEm': FieldValue.serverTimestamp(),
         'termosAceitosEm': FieldValue.serverTimestamp(),
         'termosVersao': versaoTermos,
+        'mostrarTutorial': true,
       });
       if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
     } on FirebaseAuthException catch (e) {

@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'cadastro_veiculo.dart';
 import 'categorias.dart';
 import 'chat_corrida.dart';
+import 'como_funciona.dart';
 import 'excluir_conta.dart';
 import 'aviso.dart';
 import 'carro_icone.dart';
@@ -110,6 +111,15 @@ class HomePage extends StatelessWidget {
             (dados['rg'] ?? '').toString().trim().isEmpty;
         if (dados['bloqueado'] == true) {
           return _Bloqueado(motivo: (dados['motivoBloqueio'] ?? '').toString());
+        }
+        // conta recém-criada: primeiro o passo a passo de como funciona
+        if (dados['mostrarTutorial'] == true) {
+          return ComoFuncionaPage(
+            onFim: () => FirebaseFirestore.instance
+                .collection('users')
+                .doc(uid)
+                .update({'mostrarTutorial': false}),
+          );
         }
         if (incompleto) return CompletarCadastroPage(dados: dados);
         if (dados['aprovado'] != true) return const _EmAnalise();
@@ -1531,6 +1541,8 @@ class _MapaMotoristaState extends State<_MapaMotorista>
           Navigator.pop(context);
           _abrirLoja();
         }, destaque: true),
+        ItemMenu(Icons.help_outline, 'Como funciona',
+            () => abrirDoMenu(context, const ComoFuncionaPage())),
         ItemMenu(Icons.settings_outlined, 'Configurações', () {
           Navigator.pop(context);
           Navigator.push(
