@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'cores.dart';
+import 'pagamento_auto.dart';
 
 // ---------- Regras dos tokens ----------
 
@@ -497,6 +498,7 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
               style:
                   const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
           const SizedBox(height: 10),
+          BotaoQrAutomatico(valor: v),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
