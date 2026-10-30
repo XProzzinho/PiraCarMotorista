@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const textoCreditosPadrao = 'Aplicativo em andamento;
+const textoCreditosPadrao = 'Aplicativo em andamento';
 
 /// Texto do rodapé da tela de entrada. O admin pode trocar em
 /// Administração (config/app.creditos). Sem internet, mostra o padrão.
@@ -27,7 +27,7 @@ class CreditosRodape extends StatelessWidget {
               TextSpan(
                   text: 'Em ',
                   style: TextStyle(fontWeight: FontWeight.w700)),
-              TextSpan(text: '  Andamento),
+              TextSpan(text: 'Andamento'),
             ],
           ),
           textAlign: TextAlign.center,
