@@ -40,7 +40,7 @@ class CreditosRodape extends StatelessWidget {
 
 /// Versão deste app. Ao lançar uma versão nova, mude aqui e no
 /// pubspec.yaml (version).
-const versaoApp = '1.0.3';
+const versaoApp = '1.0.7';
 
 /// "Versão 1.0.0", pequeno, embaixo dos créditos.
 class TextoVersao extends StatelessWidget {
