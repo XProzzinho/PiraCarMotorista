@@ -105,7 +105,9 @@ Future<void> pagarInfinitePay(
   final msg = ScaffoldMessenger.of(context);
   void aviso(String t) => msg.showSnackBar(SnackBar(content: Text(t)));
   final uid = FirebaseAuth.instance.currentUser?.uid;
-  final tag = handle.trim().replaceFirst(r'$', '');
+  var tag = handle.trim().replaceFirst(r'$', '');
+  final m = RegExp(r'infinitepay\.io/([^/?#\s]+)').firstMatch(tag);
+  if (m != null) tag = m.group(1)!;
   if (uid == null || tag.isEmpty) {
     aviso('Pagamento automático indisponível agora. Use a chave Pix.');
     return;
