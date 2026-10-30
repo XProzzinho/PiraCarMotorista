@@ -15,6 +15,7 @@ import 'cadastro_veiculo.dart';
 import 'categorias.dart';
 import 'chat_corrida.dart';
 import 'como_funciona.dart';
+import 'em_analise.dart';
 import 'excluir_conta.dart';
 import 'aviso.dart';
 import 'carro_icone.dart';
@@ -122,52 +123,9 @@ class HomePage extends StatelessWidget {
           );
         }
         if (incompleto) return CompletarCadastroPage(dados: dados);
-        if (dados['aprovado'] != true) return const _EmAnalise();
+        if (dados['aprovado'] != true) return const EmAnalisePage();
         return _MapaMotorista(dados: dados);
       },
-    );
-  }
-}
-
-class _EmAnalise extends StatelessWidget {
-  const _EmAnalise();
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.hourglass_top, size: 72, color: _azul),
-              const SizedBox(height: 16),
-              const Text('Cadastro em análise',
-                  style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text(
-                'Assim que o seu cadastro for aprovado, você poderá ficar '
-                'online e receber corridas.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 24),
-              OutlinedButton(
-                onPressed: () => FirebaseAuth.instance.signOut(),
-                child: const Text('Sair'),
-              ),
-              const SizedBox(height: 8),
-              TextButton.icon(
-                onPressed: () => excluirConta(context, colecoesExtras: ['cnh', 'carros']),
-                style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFFC62828)),
-                icon: const Icon(Icons.person_remove),
-                label: const Text('Excluir minha conta'),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
