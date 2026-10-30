@@ -1,30 +1,35 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import 'tutorial_cenas.dart';
+
 /// Um passo do "Como funciona" mostrado depois do cadastro.
 class PassoTutorial {
-  const PassoTutorial(this.icone, this.titulo, this.texto);
+  const PassoTutorial(this.icone, this.titulo, this.texto, this.cena);
 
   final IconData icone;
   final String titulo;
   final String texto;
+
+  /// Animação do passo (ver tutorial_cenas.dart).
+  final String cena;
 }
 
 const passosTutorial = [
   PassoTutorial(Icons.verified_user_outlined, 'Cadastro em análise',
-      'A equipe Uai Car confere seus documentos e o veículo. Assim que for aprovado, você já pode rodar.'),
+      'A equipe Uai Car confere seus documentos e o veículo. Assim que for aprovado, você já pode rodar.', 'analise'),
   PassoTutorial(Icons.account_balance_wallet_outlined, 'Tenha saldo',
-      'Cada corrida aceita desconta um pequeno valor do seu saldo. Recarregue por Pix em "Recarregar saldo", no menu. A recarga é liberada depois que a equipe confere o pagamento.'),
+      'Cada corrida aceita desconta um pequeno valor do seu saldo. Recarregue por Pix em "Recarregar saldo", no menu. A recarga é liberada depois que a equipe confere o pagamento.', 'saldo'),
   PassoTutorial(Icons.power_settings_new, 'Fique online',
-      'Deslize o botão para ficar online e deixe o GPS ligado. Você continua recebendo pedidos com o app minimizado ou a tela bloqueada.'),
+      'Deslize o botão para ficar online e deixe o GPS ligado. Você continua recebendo pedidos com o app minimizado ou a tela bloqueada.', 'online'),
   PassoTutorial(Icons.notifications_active_outlined, 'Aceite a corrida',
-      'Quando um passageiro chamar, o app toca e mostra o valor, a distância e o destino. Você tem alguns segundos para aceitar.'),
+      'Quando um passageiro chamar, o app toca e mostra o valor, a distância e o destino. Você tem alguns segundos para aceitar.', 'aceita'),
   PassoTutorial(Icons.navigation_outlined, 'Busque o passageiro',
-      'Siga a rota no mapa até o passageiro. Quando ele entrar, toque em "Iniciar corrida". Dá para conversar com ele pelo chat.'),
+      'Siga a rota no mapa até o passageiro. Quando ele entrar, toque em "Iniciar corrida". Dá para conversar com ele pelo chat.', 'busca_m'),
   PassoTutorial(Icons.flag_outlined, 'Finalize e receba',
-      'No destino, toque em "Finalizar corrida", receba do passageiro pela forma escolhida (Pix, crédito ou débito) e avalie o passageiro.'),
+      'No destino, toque em "Finalizar corrida", receba do passageiro pela forma escolhida (Pix, crédito ou débito) e avalie o passageiro.', 'finaliza'),
   PassoTutorial(Icons.menu, 'Tudo no menu',
-      'No menu lateral ficam seus ganhos do dia, o saldo, as configurações e os Termos de Uso. Este passo a passo também fica lá, em "Como funciona".'),
+      'No menu lateral ficam seus ganhos do dia, o saldo, as configurações e os Termos de Uso. Este passo a passo também fica lá, em "Como funciona".', 'menu_m'),
 ];
 
 /// Abre o passo a passo se a conta acabou de ser criada (mostrarTutorial).
@@ -111,22 +116,14 @@ class _ComoFuncionaPageState extends State<ComoFuncionaPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Container(
-                          width: 150,
-                          height: 150,
-                          decoration: const BoxDecoration(
-                              color: Color(0x1FFFFFFF), shape: BoxShape.circle),
-                          child: Center(
-                            child: Container(
-                              width: 104,
-                              height: 104,
-                              decoration: const BoxDecoration(
-                                  color: _amarelo, shape: BoxShape.circle),
-                              child: Icon(p.icone, size: 54, color: _fundo),
-                            ),
+                        Flexible(
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 360),
+                            child: CenaTutorial(
+                                key: ValueKey(p.cena), nome: p.cena),
                           ),
                         ),
-                        const SizedBox(height: 36),
+                        const SizedBox(height: 28),
                         Text('Passo ${i + 1} de ${passosTutorial.length}',
                             style: const TextStyle(
                                 color: _amarelo,
