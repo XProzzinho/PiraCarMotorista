@@ -44,12 +44,6 @@ class GavetaPiraCar extends StatelessWidget {
             const SizedBox(height: 20),
             LinksTermos(cor: fr(corMenuIcone)),
             const SizedBox(height: 4),
-            Center(
-              child: Text('Desenvolvido por Geanderson Alves @GeanAlves',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 12, color: fr(corMenuIcone))),
-            ),
-            const SizedBox(height: 4),
             const Center(child: TextoVersao()),
           ],
         ],
