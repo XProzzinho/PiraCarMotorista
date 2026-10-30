@@ -5,6 +5,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
+import 'package:url_launcher/url_launcher.dart';
 
 import 'cores.dart';
 
@@ -56,11 +58,19 @@ class BotaoQrAutomatico extends StatelessWidget {
                   label: const Text('Pagar com QR Code automático',
                       style:
                           TextStyle(fontSize: 15.5, fontWeight: FontWeight.w700)),
-                  onPressed: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (_) => QrAutomaticoPage(valor: valor)),
-                  ),
+                  onPressed: () {
+                    final cfg = snap.data?.data() ?? const <String, dynamic>{};
+                    if (cfg['provedor'] == 'infinitepay') {
+                      pagarInfinitePay(context, valor,
+                          (cfg['handle'] ?? '').toString());
+                    } else {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => QrAutomaticoPage(valor: valor)),
+                      );
+                    }
+                  },
                 ),
               ),
               const SizedBox(height: 6),
@@ -83,6 +93,79 @@ class BotaoQrAutomatico extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// InfinitePay: cria um link de pagamento (Pix ou cartão) pela API pública
+/// (só precisa da InfiniteTag), abre no navegador e deixa o pedido de
+/// recarga pendente em users/{uid}.pedidoTokens, como no Pix manual.
+/// O admin confere no app da InfinitePay e aprova em Recarga de motorista.
+Future<void> pagarInfinitePay(
+    BuildContext context, int valor, String handle) async {
+  final msg = ScaffoldMessenger.of(context);
+  void aviso(String t) => msg.showSnackBar(SnackBar(content: Text(t)));
+  final uid = FirebaseAuth.instance.currentUser?.uid;
+  final tag = handle.trim().replaceFirst(r'$', '');
+  if (uid == null || tag.isEmpty) {
+    aviso('Pagamento automático indisponível agora. Use a chave Pix.');
+    return;
+  }
+  showDialog(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => const Center(child: CircularProgressIndicator()),
+  );
+  final nav = Navigator.of(context, rootNavigator: true);
+  try {
+    final nsu = 'recarga_${uid}_${DateTime.now().millisecondsSinceEpoch}';
+    final r = await http
+        .post(
+          Uri.parse('https://api.checkout.infinitepay.io/links'),
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({
+            'handle': tag,
+            'order_nsu': nsu,
+            'items': [
+              {
+                'description': 'Recarga de saldo Uai Car Motorista',
+                'quantity': 1,
+                'price': valor * 100,
+              }
+            ],
+          }),
+        )
+        .timeout(const Duration(seconds: 20));
+    final corpo = jsonDecode(r.body);
+    String link = '';
+    if (corpo is Map) {
+      for (final k in ['url', 'link', 'checkout_url', 'payment_url']) {
+        final v = corpo[k];
+        if (v is String && v.startsWith('http')) {
+          link = v;
+          break;
+        }
+      }
+    }
+    if (r.statusCode >= 300 || link.isEmpty) {
+      throw 'resposta ${r.statusCode}';
+    }
+    await FirebaseFirestore.instance.collection('users').doc(uid).update({
+      'pedidoTokens': {
+        'valor': valor,
+        'centavos': valor * 100,
+        'pedidoEm': FieldValue.serverTimestamp(),
+        'via': 'infinitepay',
+        'orderNsu': nsu,
+        'link': link,
+      },
+    });
+    nav.pop();
+    await launchUrl(Uri.parse(link), mode: LaunchMode.externalApplication);
+    aviso('Pague na página da InfinitePay. O saldo entra assim que o '
+        'pagamento for conferido.');
+  } catch (e) {
+    nav.pop();
+    aviso('Não deu para abrir o pagamento agora ($e). Use a chave Pix.');
   }
 }
 
