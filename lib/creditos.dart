@@ -2,7 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-const textoCreditosPadrao = 'Desenvolvido por Geanderson Alves  @GeanAlves';
+const textoCreditosPadrao = 'Aplicativo em andamento;
 
 /// Texto do rodapé da tela de entrada. O admin pode trocar em
 /// Administração (config/app.creditos). Sem internet, mostra o padrão.
@@ -23,11 +23,11 @@ class CreditosRodape extends StatelessWidget {
         return const Text.rich(
           TextSpan(
             children: [
-              TextSpan(text: 'Desenvolvido por '),
+              TextSpan(text: 'Aplicativo '),
               TextSpan(
-                  text: 'Geanderson Alves',
+                  text: 'Em ',
                   style: TextStyle(fontWeight: FontWeight.w700)),
-              TextSpan(text: '  @GeanAlves'),
+              TextSpan(text: '  Andamento),
             ],
           ),
           textAlign: TextAlign.center,
@@ -40,7 +40,7 @@ class CreditosRodape extends StatelessWidget {
 
 /// Versão deste app. Ao lançar uma versão nova, mude aqui e no
 /// pubspec.yaml (version).
-const versaoApp = '1.0.7';
+const versaoApp = '1.0.8';
 
 /// "Versão 1.0.0", pequeno, embaixo dos créditos.
 class TextoVersao extends StatelessWidget {
