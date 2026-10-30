@@ -20,6 +20,7 @@ class BotaoSeguranca extends StatelessWidget {
     required this.corridaId,
     required this.souMotorista,
     required this.outroId,
+    this.tamanho = 64,
   });
 
   final String corridaId;
@@ -28,16 +29,22 @@ class BotaoSeguranca extends StatelessWidget {
   /// uid da outra pessoa da corrida (para a denúncia).
   final String? outroId;
 
+  /// 64 flutuando no mapa; 48 dentro do cartão da outra pessoa.
+  final double tamanho;
+
   @override
   Widget build(BuildContext context) {
+    final noCartao = tamanho < 64;
     return SizedBox(
-      width: 64,
-      height: 64,
+      width: tamanho,
+      height: tamanho,
       child: Material(
         color: _vermelho,
-        shape: const CircleBorder(
-            side: BorderSide(color: Colors.white, width: 3)),
-        elevation: 6,
+        shape: CircleBorder(
+            side: noCartao
+                ? BorderSide.none
+                : const BorderSide(color: Colors.white, width: 3)),
+        elevation: noCartao ? 0 : 6,
         shadowColor: Colors.black45,
         child: InkWell(
           customBorder: const CircleBorder(),
@@ -45,7 +52,8 @@ class BotaoSeguranca extends StatelessWidget {
               corridaId: corridaId,
               souMotorista: souMotorista,
               outroId: outroId),
-          child: const Icon(Icons.shield, color: Colors.white, size: 30),
+          child: Icon(Icons.shield,
+              color: Colors.white, size: tamanho * 0.47),
         ),
       ),
     );

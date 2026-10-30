@@ -1331,15 +1331,6 @@ class _MapaMotoristaState extends State<_MapaMotorista>
                 if (_corridaId != null && chatAberto(status))
                   Padding(
                     padding: const EdgeInsets.fromLTRB(0, 0, 16, 12),
-                    child: BotaoSeguranca(
-                      corridaId: _corridaId!,
-                      souMotorista: true,
-                      outroId: _corrida?['passageiroId'] as String?,
-                    ),
-                  ),
-                if (_corridaId != null && chatAberto(status))
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 0, 16, 12),
                     child: BolinhaChat(
                       corridaId: _corridaId!,
                       souMotorista: true,
@@ -1941,7 +1932,17 @@ class _MapaMotoristaState extends State<_MapaMotorista>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         if (c['passageiroId'] is String)
-          _CartaoPassageiro(uid: c['passageiroId'] as String),
+          _CartaoPassageiro(
+            uid: c['passageiroId'] as String,
+            seguranca: _corridaId != null && chatAberto(c['status'])
+                ? BotaoSeguranca(
+                    corridaId: _corridaId!,
+                    souMotorista: true,
+                    outroId: c['passageiroId'] as String,
+                    tamanho: 48,
+                  )
+                : null,
+          ),
         Text(indoBuscar ? 'Indo buscar o passageiro' : 'Corrida em andamento',
             style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 2),
@@ -2074,9 +2075,12 @@ class _AvaliacaoDialogState extends State<_AvaliacaoDialog> {
 
 /// Foto e nome do passageiro durante a corrida.
 class _CartaoPassageiro extends StatelessWidget {
-  const _CartaoPassageiro({required this.uid});
+  const _CartaoPassageiro({required this.uid, this.seguranca});
 
   final String uid;
+
+  /// Botão de segurança ao lado do nome (durante a corrida).
+  final Widget? seguranca;
 
   @override
   Widget build(BuildContext context) {
@@ -2111,6 +2115,10 @@ class _CartaoPassageiro extends StatelessWidget {
                   ],
                 ),
               ),
+              if (seguranca != null) ...[
+                const SizedBox(width: 8),
+                seguranca!,
+              ],
             ],
           ),
         );
