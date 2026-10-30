@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -269,6 +271,140 @@ class _AceiteTermosState extends State<AceiteTermos> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Antes de entrar no app, quem ainda não aceitou a versão atual dos
+/// termos (contas antigas, ou depois de uma mudança no texto) precisa
+/// aceitar.
+class PortaoTermos extends StatelessWidget {
+  const PortaoTermos({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return child;
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream:
+          FirebaseFirestore.instance.collection('users').doc(uid).snapshots(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const Scaffold(
+              body: Center(child: CircularProgressIndicator()));
+        }
+        final dados = snap.data!.data();
+        // conta ainda sendo criada (o cadastro já grava o aceite)
+        if (dados == null || dados['termosVersao'] == versaoTermos) {
+          return child;
+        }
+        return AceitarTermosPage(uid: uid);
+      },
+    );
+  }
+}
+
+class AceitarTermosPage extends StatefulWidget {
+  const AceitarTermosPage({super.key, required this.uid});
+
+  final String uid;
+
+  @override
+  State<AceitarTermosPage> createState() => _AceitarTermosPageState();
+}
+
+class _AceitarTermosPageState extends State<AceitarTermosPage> {
+  bool _aceito = false;
+  bool _salvando = false;
+
+  Future<void> _continuar() async {
+    setState(() => _salvando = true);
+    try {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.uid)
+          .update({
+        'termosAceitosEm': FieldValue.serverTimestamp(),
+        'termosVersao': versaoTermos,
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Não foi possível salvar: $e')));
+    } finally {
+      if (mounted) setState(() => _salvando = false);
+    }
+  }
+
+  Widget _botaoLer(String texto, bool privacidade) {
+    return OutlinedButton.icon(
+      onPressed: () => TermosPage.abrir(context, privacidade: privacidade),
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size.fromHeight(52),
+        shape: const StadiumBorder(),
+      ),
+      icon: const Icon(Icons.description_outlined),
+      label: Text(texto),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cor = Theme.of(context).colorScheme.onSurface;
+    return Scaffold(
+      body: SafeArea(
+        child: ListView(
+          padding: const EdgeInsets.fromLTRB(24, 40, 24, 24),
+          children: [
+            const Center(
+              child: CircleAvatar(
+                radius: 44,
+                backgroundColor: Color(0xFFFFC24B),
+                child: Icon(Icons.verified_user_outlined,
+                    size: 46, color: Color(0xFF0B2545)),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text('Termos de Uso e Privacidade',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 24, fontWeight: FontWeight.w800, color: cor)),
+            const SizedBox(height: 10),
+            Text(
+              'Para continuar usando o Uai Car, leia e aceite os Termos de '
+              'Uso e a Política de Privacidade.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 15.5, height: 1.4, color: cor.withOpacity(0.75)),
+            ),
+            const SizedBox(height: 28),
+            _botaoLer('Ler os Termos de Uso', false),
+            const SizedBox(height: 12),
+            _botaoLer('Ler a Política de Privacidade', true),
+            const SizedBox(height: 20),
+            AceiteTermos(
+              aceito: _aceito,
+              onChanged: (v) => setState(() => _aceito = v),
+            ),
+            const SizedBox(height: 16),
+            SizedBox(
+              height: 56,
+              child: FilledButton(
+                onPressed: _aceito && !_salvando ? _continuar : null,
+                style: FilledButton.styleFrom(shape: const StadiumBorder()),
+                child: Text(_salvando ? 'Salvando...' : 'Aceitar e continuar'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => FirebaseAuth.instance.signOut(),
+              child: const Text('Sair'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
