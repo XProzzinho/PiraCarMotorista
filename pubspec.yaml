@@ -31,4 +31,5 @@ flutter:
   assets:
     - assets/logo.png
     - assets/veiculos/
+    - assets/legal/
     - assets/som/

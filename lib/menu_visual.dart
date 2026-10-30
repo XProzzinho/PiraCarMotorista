@@ -1,3 +1,4 @@
+import 'termos.dart';
 import 'package:flutter/material.dart';
 import 'cores.dart';
 import 'creditos.dart';
@@ -40,7 +41,9 @@ class GavetaPiraCar extends StatelessWidget {
           const Divider(height: 24),
           const ItemModoEscuro(),
           if (rodape) ...[
-            const SizedBox(height: 28),
+            const SizedBox(height: 20),
+            LinksTermos(cor: fr(corMenuIcone)),
+            const SizedBox(height: 4),
             Center(
               child: Text('Desenvolvido por Geanderson Alves @GeanAlves',
                   textAlign: TextAlign.center,

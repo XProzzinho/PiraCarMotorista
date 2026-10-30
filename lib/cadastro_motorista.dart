@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'cadastro_etapas.dart';
+import 'termos.dart';
 import 'cadastro_veiculo.dart';
 import 'categorias.dart';
 import 'cores.dart';
@@ -27,6 +28,7 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
   int _etapa = 1;
   bool _carregando = false;
   bool _verSenha = false;
+  bool _aceitouTermos = false;
 
   // categoria extra do carro ('sedan' ou 'conforto'); null = só PiraCar
   String? _extra;
@@ -135,6 +137,9 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
           return 'A senha precisa ter pelo menos 6 caracteres.';
         }
         if (_senha.text != _senha2.text) return 'As senhas não são iguais.';
+        if (!_aceitouTermos) {
+          return 'Para criar a conta, aceite os Termos de Uso e a Política de Privacidade.';
+        }
         return null;
     }
   }
@@ -204,6 +209,9 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
         'role': 'motorista',
         'aprovado': false,
         'criadoEm': FieldValue.serverTimestamp(),
+        'termosAceitosEm': FieldValue.serverTimestamp(),
+        'termosVersao': versaoTermos,
+        'mostrarTutorial': true,
       });
       if (mounted) Navigator.of(context).popUntil((r) => r.isFirst);
     } on FirebaseAuthException catch (e) {
@@ -480,10 +488,19 @@ class _CadastroMotoristaPageState extends State<CadastroMotoristaPage> {
         titulo: 'Crie seu acesso',
         subtitulo: 'É com esse e-mail e senha que você vai entrar.',
         botao: 'Enviar cadastro',
-        rodape: const Text(
-          'Seu cadastro passa por aprovação antes da primeira corrida.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 13, color: corTextoSuave),
+        rodape: Column(
+          children: [
+            AceiteTermos(
+              aceito: _aceitouTermos,
+              onChanged: (v) => setState(() => _aceitouTermos = v),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Seu cadastro passa por aprovação antes da primeira corrida.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 13, color: corTextoSuave),
+            ),
+          ],
         ),
         campos: [
           CampoCadastro(
