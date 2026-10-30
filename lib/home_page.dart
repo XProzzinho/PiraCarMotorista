@@ -14,6 +14,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'cadastro_veiculo.dart';
 import 'categorias.dart';
 import 'chat_corrida.dart';
+import 'seguranca.dart';
 import 'como_funciona.dart';
 import 'em_analise.dart';
 import 'excluir_conta.dart';
@@ -1327,6 +1328,15 @@ class _MapaMotoristaState extends State<_MapaMotorista>
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.end,
               children: [
+                if (_corridaId != null && chatAberto(status))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 0, 16, 12),
+                    child: BotaoSeguranca(
+                      corridaId: _corridaId!,
+                      souMotorista: true,
+                      outroId: _corrida?['passageiroId'] as String?,
+                    ),
+                  ),
                 if (_corridaId != null && chatAberto(status))
                   Padding(
                     padding: const EdgeInsets.fromLTRB(0, 0, 16, 12),
