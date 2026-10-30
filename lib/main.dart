@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'creditos.dart';
 import 'home_page.dart';
 import 'login_page.dart';
+import 'portao_localizacao.dart';
 import 'termos.dart';
 import 'cores.dart';
 
@@ -25,7 +26,9 @@ class PiraCarMotoristaApp extends StatelessWidget {
       title: 'Uai Car Motorista',
       debugShowCheckedModeBanner: false,
       theme: temaPiraCar(const Color(0xFF1E88E5)),
-      home: StreamBuilder<User?>(
+      home: PortaoLocalizacao(
+        souMotorista: true,
+        child: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
@@ -38,6 +41,7 @@ class PiraCarMotoristaApp extends StatelessWidget {
               : const VerificaVersao(
                   campo: 'versaoMinimaMotorista', child: LoginPage());
         },
+      ),
       ),
       ),
     );
