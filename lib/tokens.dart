@@ -59,7 +59,7 @@ Future<int> custoCorridaAtual() async {
 const avisoSaldo = 500;
 
 /// Recargas da loja, em reais.
-const recargas = [5, 10];
+const recargas = [5, 10, 50, 10];
 
 int custoCorrida(int saldo) => saldo > 0 ? custoPositivo : custoNegativo;
 
