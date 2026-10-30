@@ -59,7 +59,7 @@ Future<int> custoCorridaAtual() async {
 const avisoSaldo = 500;
 
 /// Recargas da loja, em reais.
-const recargas = [5, 10, 50, 10];
+const recargas = [5, 10, 50, 100];
 
 int custoCorrida(int saldo) => saldo > 0 ? custoPositivo : custoNegativo;
 
@@ -336,14 +336,19 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
                     style:
                         TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 12),
-                Row(
-                  children: [
-                    for (final v in recargas) ...[
-                      Expanded(child: _cartaoRecarga(v)),
-                      if (v != recargas.last) const SizedBox(width: 12),
+                for (var i = 0; i < recargas.length; i += 2) ...[
+                  if (i > 0) const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(child: _cartaoRecarga(recargas[i])),
+                      const SizedBox(width: 12),
+                      Expanded(
+                          child: i + 1 < recargas.length
+                              ? _cartaoRecarga(recargas[i + 1])
+                              : const SizedBox()),
                     ],
-                  ],
-                ),
+                  ),
+                ],
                 const SizedBox(height: 12),
                 OutlinedButton.icon(
                   onPressed: _outroValor,
@@ -458,12 +463,18 @@ class _LojaSaldoPageState extends State<LojaSaldoPage> {
               width: sel ? 2.5 : 1.5),
         ),
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(Icons.add_card, color: Color(0xFFFFB300), size: 32),
             const SizedBox(height: 6),
-            Text(reais(v * 100),
-                style: const TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w800, color: _verde)),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(reais(v * 100),
+                  maxLines: 1,
+                  softWrap: false,
+                  style: const TextStyle(
+                      fontSize: 22, fontWeight: FontWeight.w800, color: _verde)),
+            ),
             Text('${v * 100 ~/ custoPositivo} corridas',
                 style: TextStyle(fontSize: 12, color: fr(Colors.black54))),
           ],
